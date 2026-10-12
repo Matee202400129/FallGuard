@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FallGuard">
+<meta name="theme-color" content="#0f1218">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>FallGuard</title>
+<style>
+  :root {
+    --bg: #0f1218; --card: #1b202a; --card2: #262d3a; --line: #2c3442;
+    --text: #e8ecf2; --muted: #96a0af; --ok: #3ddc84; --warn: #ffb020;
+    --alert: #ff4d4f; --accent: #4c8dff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Leelawadee UI", Tahoma, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    -webkit-user-select: none; user-select: none;
+  }
+  [hidden] { display: none !important; }
+  h1 { font-size: 28px; margin: 4px 0 0; letter-spacing: .2px; }
+  h2 { font-size: 18px; margin: 0; }
+  .sub { color: var(--muted); margin: 2px 0 14px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .card { background: var(--card); border-radius: 14px; padding: 13px 14px; margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .grow { flex: 1; min-width: 0; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--muted); }
+  .dot.s { width: 8px; height: 8px; }
+  button, .btn {
+    font: inherit; font-size: 15px; border: 0; border-radius: 12px; padding: 12px 14px; width: 100%;
+    background: var(--card2); color: var(--text); cursor: pointer; display: block; text-align: center;
+  }
+  button.primary { background: var(--accent); color: #fff; font-weight: 600; }
+  button.danger { background: var(--alert); color: #fff; font-weight: 700; }
+  button.warn { background: var(--warn); color: #111; font-weight: 600; }
+  button:active { opacity: .75; }
+  button + button { margin-top: 8px; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; }
+  input.search {
+    width: 100%; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--card2);
+    border-radius: 12px; padding: 11px 14px; margin-bottom: 10px; outline: none; -webkit-user-select: text; user-select: text;
+  }
+  input.search::placeholder { color: var(--muted); }
+
+  /* การ์ดกล้อง */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cam { background: var(--card); border-radius: 14px; overflow: hidden; cursor: pointer; position: relative;
+         border: 1px solid transparent; }
+  .cam.wide { grid-column: 1 / -1; }
+  .cam.fallen { border: 2px solid var(--alert); }
+  .cam.offline { border-color: rgba(255,77,79,.45); }
+  .cam .media { position: relative; background: #000; height: 104px; display: flex; align-items: center; justify-content: center; }
+  .cam.wide .media { height: 170px; }
+  .cam.wide.tall .media { height: 150px; }
+  .cam img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam.wide.all img { object-fit: contain; }
+  .cam.offline img { opacity: .35; }
+  .cam .ph { font-size: 28px; color: var(--muted); }
+  .cam .tiles { position: absolute; inset: 0; display: grid; gap: 2px; background: #111; }
+  .cam .tile { background: #000; overflow: hidden; }
+  .cam .tile.off img { opacity: .35; }
+  .cam .off { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+              color: var(--alert); font-weight: 700; }
+  .pill { position: absolute; top: 8px; padding: 3px 8px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; }
+  .pill.people { right: 8px; background: rgba(0,0,0,.66); }
+  .pill.alarm { left: 8px; background: var(--alert); }
+  .cam .info { padding: 9px 12px 11px; }
+  .cam .name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cam .st { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ประวัติ */
+  .ev .t { font-weight: 700; }
+  .ev img { width: 100%; max-height: 190px; object-fit: contain; background: #000; border-radius: 10px; margin: 6px 0 4px; display: block; }
+
+  /* ดูกล้อง */
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; width: auto; padding: 8px 15px; border-radius: 18px; background: var(--card); white-space: nowrap; font-size: 14px; }
+  .chip.on { background: var(--accent); color: #fff; }
+  .screen { background: #000; border-radius: 12px; overflow: hidden; position: relative; aspect-ratio: 4 / 3; }
+  .screen canvas, .screen img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .live-status { margin-top: 10px; font-size: 15px; }
+  .back { width: auto; display: inline-block; padding: 8px 14px; margin-bottom: 10px; }
+
+  /* แจ้งเตือนเต็มจอ */
+  #v-alert { position: fixed; inset: 0; background: #96081a; z-index: 10; overflow-y: auto;
+             padding: max(24px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom)); text-align: center; }
+  #v-alert h1 { font-size: 32px; margin-top: 18px; }
+  #v-alert .msg { font-size: 21px; margin: 14px 0 6px; }
+  #v-alert img { width: 100%; max-height: 34vh; object-fit: contain; background: rgba(0,0,0,.25); border-radius: 12px; margin: 14px 0; }
+  #v-alert button.ackbtn { background: #fff; color: #96081a; font-size: 21px; font-weight: 800; padding: 17px; border-radius: 18px; }
+  #v-alert button.ghost { background: transparent; border: 2px solid #fff; color: #fff; font-size: 17px; }
+
+  /* ติดตั้ง / จับคู่ */
+  .steps { counter-reset: s; padding: 0; margin: 0; list-style: none; }
+  .steps li { counter-increment: s; position: relative; padding: 0 0 14px 40px; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: -2px; width: 28px; height: 28px; border-radius: 50%;
+                      background: var(--accent); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .share { display: inline-block; vertical-align: -4px; width: 20px; height: 20px; }
+  #scan-video { width: 100%; border-radius: 12px; background: #000; aspect-ratio: 3 / 4; object-fit: cover; }
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+           background: #222b38; color: var(--text); padding: 10px 16px; border-radius: 12px; z-index: 20; max-width: 90vw;
+           box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+</style>
+</head>
+<body>
+
+<!-- ติดตั้งลงหน้าจอโฮม (เปิดใน Safari) -->
+<section id="v-install" hidden>
+  <h1>FallGuard</h1>
+  <p class="sub">แจ้งเตือนคนล้มเข้า iPhone</p>
+  <div class="card">
+    <h2 style="margin-bottom:10px">เพิ่มลงหน้าจอโฮมก่อนใช้งาน</h2>
+    <p class="muted small" style="margin-top:0">iPhone ส่งแจ้งเตือนให้เว็บแอปได้เฉพาะเมื่อเปิดจากไอคอนบนหน้าจอโฮม</p>
+    <ol class="steps">
+      <li>แตะปุ่มแชร์
+        <svg class="share" viewBox="0 0 24 24" fill="none" stroke="#4c8dff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>
+        ด้านล่างของ Safari</li>
+      <li>เลื่อนลงแล้วแตะ <b>เพิ่มไปยังหน้าจอโฮม</b></li>
+      <li>เปิด FallGuard จากไอคอนบนหน้าจอโฮม <span id="install-paired" class="muted" hidden>(จับคู่ให้แล้วจาก QR นี้)</span></li>
+    </ol>
+  </div>
+  <p class="muted small" id="install-note">ต้องใช้ iOS 16.4 ขึ้นไป และต้องเปิดใน Safari</p>
+  <button id="install-continue">ใช้ในเบราว์เซอร์ไปก่อน (ไม่มีแจ้งเตือน)</button>
+</section>
+
+<!-- จับคู่ -->
+<section id="v-pair" hidden>
+  <h1>FallGuard</h1>
+  <p class="sub">แจ้งเตือนคนล้มเข้ามือถือ</p>
+  <div class="card">
+    <h2 style="margin-bottom:8px">เริ่มใช้งาน</h2>
+    <p style="margin-top:0">1. บนคอม เปิดโปรแกรม FallGuard กด <b>"เชื่อมมือถือ"</b> แล้วเลือก <b>iPhone</b><br>
+       2. แตะปุ่มด้านล่าง แล้วส่องกล้องไปที่ QR บนจอคอม</p>
+    <p class="muted small">QR มีกุญแจเข้ารหัสอยู่ข้างใน ข้อความแจ้งเตือนที่วิ่งผ่านอินเทอร์เน็ตจึงไม่มีใครอ่านได้นอกจากมือถือที่สแกนแล้ว</p>
+    <button class="primary" id="pair-scan">สแกน QR จากคอม</button>
+    <button id="pair-paste">วางลิงก์แทน</button>
+  </div>
+  <div id="scan-box" hidden>
+    <video id="scan-video" playsinline muted></video>
+    <p class="muted small" id="scan-hint">ส่องกล้องไปที่ QR บนจอคอม</p>
+    <button id="scan-cancel">ยกเลิก</button>
+  </div>
+</section>
+
+<!-- หน้าแรก -->
+<section id="v-home" hidden>
+  <h1>FallGuard</h1>
+  <p class="sub" id="home-name">บ้าน</p>
+  <div class="card">
+    <div class="row"><span class="dot" id="st-dot"></span><b class="grow" id="st-title" style="font-size:18px">กำลังเชื่อมต่อ…</b></div>
+    <div class="muted small" id="st-detail" style="margin-top:6px"></div>
+  </div>
+  <div id="checks"></div>
+
+  <div class="section-head"><h2 id="cam-title">กล้อง</h2><span class="small muted" id="cam-updated"></span></div>
+  <input class="search" id="cam-search" type="search" placeholder="🔍  ค้นหากล้อง…" autocomplete="off" hidden>
+  <div class="grid" id="cam-grid"></div>
+
+  <div class="section-head"><h2>เหตุการณ์ล่าสุด</h2></div>
+  <div id="history"></div>
+
+  <div style="margin-top:14px">
+    <button id="btn-test">ทดสอบแจ้งเตือนเข้าเครื่องนี้</button>
+    <button id="btn-rename">ชื่อเครื่องนี้</button>
+    <button id="btn-unpair">จับคู่ใหม่ / ยกเลิกการจับคู่</button>
+  </div>
+</section>
+
+<!-- ดูกล้อง -->
+<section id="v-live" hidden>
+  <button class="back" id="live-back">‹ กลับ</button>
+  <h2 style="font-size:24px;margin-bottom:10px">ดูกล้อง</h2>
+  <div class="chips" id="live-chips"></div>
+  <div class="screen" id="live-screen"><canvas id="live-canvas"></canvas></div>
+  <div class="live-status" id="live-status">กำลังต่อ…</div>
+  <div class="small muted" id="live-detail"></div>
+  <button class="primary" id="live-snap" style="margin-top:10px" hidden>ขอภาพล่าสุดผ่านเน็ต</button>
+  <p class="small muted">ภาพที่เห็นผ่านโหมดความเป็นส่วนตัวที่ตั้งไว้บนคอมแล้ว (เปลี่ยนได้ที่ "โหมดภาพ" ในหน้าต่าง FallGuard บนคอม)
+    ภาพทุกเฟรมเข้ารหัส ไม่มีใครดูได้นอกจากมือถือที่จับคู่</p>
+</section>
+
+<!-- แจ้งเตือนเต็มจอ -->
+<section id="v-alert" hidden>
+  <h1 id="al-title">ตรวจพบคนล้ม</h1>
+  <div class="msg" id="al-msg"></div>
+  <div id="al-meta" style="opacity:.85"></div>
+  <img id="al-img" alt="" hidden>
+  <div id="al-img-hint" class="small" style="opacity:.8"></div>
+  <div style="height:16px"></div>
+  <button class="ackbtn" id="al-ack">รับทราบ - กำลังไปดู</button>
+  <button class="ghost" id="al-live" style="margin-top:10px">ดูกล้องตอนนี้</button>
+  <button class="ghost" id="al-close" style="margin-top:10px;border-color:rgba(255,255,255,.4)">ปิด</button>
+  <p class="small" style="opacity:.8">กดรับทราบแล้ว มือถือทุกเครื่องกับคอมจะรู้ว่ามีคนรับเรื่องแล้ว</p>
+</section>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="crypto.js"></script>
+<script src="vendor/jsQR.js" defer></script>
+<script src="app.js"></script>
+</body>
+</html>
