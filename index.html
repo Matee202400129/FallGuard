@@ -109,6 +109,17 @@
                       background: var(--accent); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
   .share { display: inline-block; vertical-align: -4px; width: 20px; height: 20px; }
   #scan-video { width: 100%; border-radius: 12px; background: #000; aspect-ratio: 3 / 4; object-fit: cover; }
+  /* จัดการกล้อง */
+  .opt { background: var(--card); border-radius: 14px; padding: 11px 14px; margin-bottom: 8px; border: 2px solid transparent; cursor: pointer; }
+  .opt.on { border-color: var(--accent); }
+  .opt .tag { float: right; background: var(--warn); color: #111; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
+  .camrow { background: var(--card); border-radius: 14px; padding: 11px 14px; margin-bottom: 8px; cursor: pointer; }
+  .manage-btn { width: auto; padding: 6px 12px; border-radius: 14px; font-size: 14px; font-weight: 700; margin-left: 10px; }
+  .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 15; display: flex; align-items: flex-end; }
+  .sheet { background: #161b24; width: 100%; border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); max-height: 90vh; overflow-y: auto; }
+  .sheet input { width: 100%; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--card2); border-radius: 12px;
+                 padding: 11px 13px; margin-bottom: 8px; -webkit-user-select: text; user-select: text; }
+  .sheet .found { background: var(--card); border-radius: 12px; padding: 10px 13px; margin-bottom: 6px; cursor: pointer; }
   .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
            background: #222b38; color: var(--text); padding: 10px 16px; border-radius: 12px; z-index: 20; max-width: 90vw;
            box-shadow: 0 6px 24px rgba(0,0,0,.4); }
@@ -164,7 +175,8 @@
   </div>
   <div id="checks"></div>
 
-  <div class="section-head"><h2 id="cam-title">กล้อง</h2><span class="small muted" id="cam-updated"></span></div>
+  <div class="section-head"><h2 id="cam-title" class="grow">กล้อง</h2><span class="small muted" id="cam-updated"></span>
+    <button class="manage-btn" id="btn-manage">⚙ จัดการ</button></div>
   <input class="search" id="cam-search" type="search" placeholder="🔍  ค้นหากล้อง…" autocomplete="off" hidden>
   <div class="grid" id="cam-grid"></div>
 
@@ -190,6 +202,20 @@
   <p class="small muted">ภาพที่เห็นผ่านโหมดความเป็นส่วนตัวที่ตั้งไว้บนคอมแล้ว (เปลี่ยนได้ที่ "โหมดภาพ" ในหน้าต่าง FallGuard บนคอม)
     ภาพทุกเฟรมเข้ารหัส ไม่มีใครดูได้นอกจากมือถือที่จับคู่</p>
 </section>
+
+<!-- จัดการกล้อง -->
+<section id="v-manage" hidden>
+  <button class="back" id="manage-back">‹ กลับ</button>
+  <h2 style="font-size:24px">จัดการกล้อง</h2>
+  <div class="small" id="manage-status" style="margin:4px 0 12px">กำลังต่อคอม…</div>
+  <h2>ระดับการเห็นภาพ</h2>
+  <div class="small muted" style="margin-bottom:8px">ใช้กับทุกที่: มือถือทุกเครื่อง จอคอม และภาพตอนเกิดเหตุ</div>
+  <div id="manage-modes"></div>
+  <h2 style="margin-top:16px">กล้อง</h2>
+  <div id="manage-cams" style="margin-top:8px"></div>
+  <button class="primary" id="manage-add">+ เพิ่มกล้อง</button>
+</section>
+<div class="sheet-bg" id="sheet-bg" hidden><div class="sheet" id="sheet"></div></div>
 
 <!-- แจ้งเตือนเต็มจอ -->
 <section id="v-alert" hidden>

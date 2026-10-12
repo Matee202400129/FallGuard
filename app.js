@@ -100,7 +100,7 @@ function toast(text, ms = 2600) {
 }
 
 function show(view) {
-  for (const v of ["install", "pair", "home", "live", "alert"]) $("v-" + v).hidden = v !== view;
+  for (const v of ["install", "pair", "home", "live", "manage", "alert"]) $("v-" + v).hidden = v !== view;
   if (view !== "alert") S.view = view;
   if (view === "home") renderHome();
 }
@@ -860,6 +860,154 @@ function showSnapshot() {
   img.src = src;
 }
 
+// ----------------------------------------------------- จัดการกล้อง
+/** ส่งคำสั่งถึงคอม (เข้ารหัส มีเวลา+เลขสุ่ม กันส่งซ้ำ) ส่งเป็นข้อความธรรมดา ไม่ต้องขออนุญาตล่วงหน้า */
+async function pcCommand(cmd) {
+  const base = S.pc.tunnel;
+  if (!base || !S.proto) return null;
+  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
+  const body = await S.proto.seal(Object.assign({ ts: Date.now() / 1000, nonce, by: deviceName() }, cmd));
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 30000);   // ค้นหาเว็บแคมใช้เวลาหลายวินาที
+  try {
+    const r = await fetch(base + "/m/cmd", { method: "POST", body, signal: ctl.signal, cache: "no-store" });
+    if (!r.ok) return null;
+    return await S.proto.open((await r.text()).trim());
+  } catch (e) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const M = { state: null };
+
+function manageStatus(text, color) {
+  $("manage-status").textContent = text;
+  $("manage-status").style.color = color || "";
+}
+
+async function manageRun(cmd, busy) {
+  manageStatus(busy, "var(--warn)");
+  const res = await pcCommand(cmd);
+  if (!res) return manageStatus("ต่อคอมไม่ได้ - ต้องเปิดเฝ้าระวังบนคอมไว้ (และเปิดภาพสดนอกบ้าน)", "var(--alert)"), null;
+  if (res.ok === false) return manageStatus(res.error || "คอมทำคำสั่งนี้ไม่สำเร็จ", "var(--alert)"), res;
+  manageStatus("เชื่อมต่อคอมแล้ว · เปลี่ยนแล้วมีผลทันที", "var(--ok)");
+  if (res.cameras) {
+    M.state = res;
+    renderManage();
+    S.live = null;            // ให้หน้าแรกดึงรายการกล้องใหม่
+    S.thumbs = {};
+  }
+  return res;
+}
+
+function openManage() {
+  show("manage");
+  manageRun({ cmd: "cameras" }, "กำลังต่อคอม…");
+}
+
+function renderManage() {
+  const st = M.state;
+  const modes = $("manage-modes");
+  modes.innerHTML = "";
+  for (const m of st.modes || []) {
+    const row = el("div", "opt" + (m.value === st.mode ? " on" : ""));
+    if (m.value === "cctv") row.append(el("span", "tag", "เห็นหน้า"));
+    row.append(el("b", "", (m.value === st.mode ? "✓  " : "") + m.label));
+    row.append(el("div", "muted small", m.desc));
+    row.onclick = () => pickMode(m);
+    modes.append(row);
+  }
+  const cams = $("manage-cams");
+  cams.innerHTML = "";
+  for (const c of st.cameras || []) {
+    const row = el("div", "camrow");
+    row.append(el("b", "", c.name));
+    const kind = c.kind === "network" ? "กล้องวงจรปิด" : c.kind === "webcam" ? "เว็บแคม" : "ไฟล์";
+    row.append(el("div", "muted small", kind + " · " + c.label));
+    let text = "● เฝ้าอยู่", color = "var(--ok)";
+    if (!c.ok && c.connecting) { text = "● กำลังเชื่อมต่อ…"; color = "var(--warn)"; }
+    else if (!c.ok) { text = "● ใช้ไม่ได้" + (c.error ? ": " + c.error : ""); color = "var(--alert)"; }
+    const s = el("div", "small", text);
+    s.style.color = color;
+    row.append(s);
+    row.onclick = () => editSheet(c);
+    cams.append(row);
+  }
+}
+
+function pickMode(m) {
+  if (m.value === M.state.mode) return;
+  if (m.value === "cctv" && !confirm("เปลี่ยนเป็น \"กล้องวงจรปิด\"?\n\nภาพจริงทั้งหมด เห็นหน้าคนชัดเจน จะเห็นหน้าทุกที่: "
+      + "มือถือทุกเครื่องที่จับคู่ จอคอม และภาพตอนเกิดเหตุ (ภาพยังเข้ารหัสระหว่างทาง คนนอกดูไม่ได้)")) return;
+  if (m.value === "raw" && !confirm("เปลี่ยนเป็น \"ภาพจริง ปิดหน้า\"?\n\nเห็นภาพห้องจริงทั้งหมด แต่ใบหน้าถูกปิดไว้")) return;
+  manageRun({ cmd: "mode", mode: m.value }, "กำลังเปลี่ยนเป็น " + m.label + "…");
+}
+
+function closeSheet() {
+  $("sheet-bg").hidden = true;
+  $("sheet").innerHTML = "";
+}
+
+/** cam = null คือเพิ่มกล้องใหม่ */
+function editSheet(cam) {
+  const adding = !cam;
+  const sheet = $("sheet");
+  sheet.innerHTML = "";
+  sheet.append(el("h2", "", adding ? "เพิ่มกล้อง" : "แก้ไขกล้อง"));
+  sheet.lastChild.style.marginBottom = "12px";
+  const name = el("input");
+  name.placeholder = "ชื่อห้อง เช่น ห้องนอน (ขึ้นในแจ้งเตือน)";
+  name.value = adding ? "" : cam.name.replace(" (จำลอง)", "");
+  const source = el("input");
+  source.placeholder = adding ? "เลขเว็บแคม (เช่น 1) หรือ rtsp://..." : "เว้นว่าง = ใช้แหล่งภาพเดิม";
+  source.autocapitalize = "off";
+  source.autocomplete = "off";
+  source.spellcheck = false;
+  sheet.append(name, source);
+  sheet.append(el("div", "muted small", "เว็บแคมที่เสียบกับคอม: ใส่เลข หรือกด \"ค้นหาเว็บแคม\"\n"
+    + "กล้องวงจรปิด: rtsp://ชื่อผู้ใช้:รหัสผ่าน@ไอพีกล้อง:554/... (Tapo: แอป Tapo → ตั้งค่ากล้อง → บัญชีกล้อง)"));
+  sheet.lastChild.style.whiteSpace = "pre-line";
+  const found = el("div");
+  found.style.margin = "8px 0";
+  const find = el("button", "", "ค้นหาเว็บแคมที่เสียบกับคอม");
+  find.onclick = async () => {
+    find.textContent = "กำลังค้นหา (ราว 10 วินาที)…";
+    const res = await pcCommand({ cmd: "probe" });
+    find.textContent = "ค้นหาเว็บแคมที่เสียบกับคอม";
+    found.innerHTML = "";
+    if (!res || !res.found) return found.append(el("div", "muted small", "ค้นหาไม่ได้ - ต่อคอมไม่ได้"));
+    if (!res.found.length) return found.append(el("div", "muted small", "ไม่พบเว็บแคมเพิ่ม (ที่เสียบอยู่ถูกใช้หมดแล้ว หรือยังไม่ได้เสียบ)"));
+    for (const f of res.found) {
+      const row = el("div", "found", `เว็บแคม ${f.index}  (${f.size})` + (f.black ? "  - ภาพดำ อาจไม่ใช่กล้องจริง" : "  - มีภาพ"));
+      row.onclick = () => { source.value = String(f.index); found.innerHTML = ""; };
+      found.append(row);
+    }
+  };
+  sheet.append(find, found);
+  const save = el("button", "primary", adding ? "เพิ่ม" : "บันทึก");
+  save.onclick = async () => {
+    closeSheet();
+    await manageRun(Object.assign({ cmd: adding ? "add" : "edit", name: name.value.trim(), source: source.value.trim() },
+      adding ? {} : { id: cam.id }), adding ? "กำลังเพิ่มกล้อง…" : "กำลังบันทึก…");
+  };
+  sheet.append(save);
+  if (!adding) {
+    const del = el("button", "danger", "ลบกล้อง");
+    del.onclick = async () => {
+      if (!confirm(`ลบ "${cam.name}"? บริเวณนี้จะไม่ถูกเฝ้าระวังอีก`)) return;
+      closeSheet();
+      await manageRun({ cmd: "remove", id: cam.id }, "กำลังลบกล้อง…");
+    };
+    sheet.append(del);
+  }
+  const cancel = el("button", "", "ยกเลิก");
+  cancel.onclick = closeSheet;
+  sheet.append(cancel);
+  $("sheet-bg").hidden = false;
+}
+
 // ------------------------------------------------------------ Web Push
 async function enablePush() {
   try {
@@ -1013,6 +1161,10 @@ $("live-back").onclick = () => {
   show("home");
 };
 $("live-snap").onclick = requestSnapshot;
+$("btn-manage").onclick = openManage;
+$("manage-back").onclick = () => show("home");
+$("manage-add").onclick = () => editSheet(null);
+$("sheet-bg").onclick = (e) => { if (e.target === $("sheet-bg")) closeSheet(); };
 $("al-ack").onclick = () => S.alertId && ack(S.alertId);
 $("al-live").onclick = () => {
   const e = S.history.find((x) => x.id === S.alertId);
