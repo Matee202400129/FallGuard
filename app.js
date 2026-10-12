@@ -543,6 +543,8 @@ function renderHistory() {
     let color = "var(--alert)";
     if (e.kind === "recovered") { t = "ลุกขึ้นได้แล้ว"; color = "var(--ok)"; }
     if (e.kind === "near_fall") { t = "ทรุดแต่ลุกเองได้"; color = "var(--warn)"; }
+    if (e.kind === "power_lost") color = "var(--warn)";
+    if (e.kind === "power_back") color = "var(--ok)";
     if (e.test) t = "[ทดสอบ] " + t;
     const tt = el("div", "t", t);
     tt.style.color = color;
