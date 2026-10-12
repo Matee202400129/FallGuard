@@ -658,18 +658,39 @@ function modeLabel(value) {
   return m ? m.label : "…";
 }
 
-function renderModeButton() {
-  $("live-mode").textContent = "👁 ระดับภาพ: " + (S.mode ? modeLabel(S.mode) : "…");
+/** ระดับภาพของกล้องที่กำลังดู ("mixed" = ทุกกล้องตั้งไม่เหมือนกัน) */
+function camLevel(id) {
+  const c = liveCams().find((x) => x.id === id);
+  return (c && c.privacy) || S.mode;
 }
 
-/** เปลี่ยนระดับการเห็นภาพ (มีผลทุกที่) - ระดับที่เห็นภาพจริงต้องยืนยันก่อน */
-async function setMode(m) {
-  if (m.value === S.mode) return true;
-  if (m.value === "cctv" && !confirm("เปลี่ยนเป็น \"กล้องวงจรปิด\"?\n\nภาพจริงทั้งหมด เห็นหน้าคนชัดเจน จะเห็นหน้าทุกที่: "
-      + "มือถือทุกเครื่องที่จับคู่ จอคอม และภาพตอนเกิดเหตุ (ภาพยังเข้ารหัสระหว่างทาง คนนอกดูไม่ได้)")) return false;
-  if (m.value === "raw" && !confirm("เปลี่ยนเป็น \"ภาพจริง ปิดหน้า\"?\n\nเห็นภาพห้องจริงทั้งหมด แต่ใบหน้าถูกปิดไว้")) return false;
-  toast("กำลังเปลี่ยนเป็น " + m.label + "…");
-  const res = await pcCommand({ cmd: "mode", mode: m.value });
+function renderModeButton() {
+  const level = camLevel(V.cam);
+  $("live-mode").textContent = "👁 ระดับภาพ: " + (level === "mixed" ? "แยกตามกล้อง" : level ? modeLabel(level) : "…");
+}
+
+/** ขอรายชื่อกล้อง (พร้อมระดับภาพของแต่ละกล้อง) ใหม่จากคอม */
+async function refreshCams() {
+  const o = await pcGet("info");
+  if (o && o.cams) {
+    S.live = { cams: o.cams, at: Date.now() };
+    noteMode(o);
+    if (S.view === "live") renderChips();
+  }
+}
+
+/**
+ * เปลี่ยนระดับการเห็นภาพของกล้องหนึ่ง (camId = -1 คือทุกกล้อง) - ระดับที่เห็นภาพจริงต้องยืนยันก่อน
+ * แต่ละกล้องตั้งต่างกันได้ เช่น หน้าบ้าน = กล้องวงจรปิด, ห้องนอน = โครงกระดูก
+ */
+async function setMode(m, camId) {
+  const where = camId === -1 ? "ทุกกล้อง" : (liveCams().find((x) => x.id === camId) || {}).name || "กล้องนี้";
+  if (camId !== -1 && m.value === camLevel(camId)) return true;
+  if (m.value === "cctv" && !confirm(`ให้ "${where}" เป็นกล้องวงจรปิด?\n\nภาพจริงทั้งหมด เห็นหน้าคนชัดเจน `
+      + "ทั้งในมือถือทุกเครื่องที่จับคู่ จอคอม และภาพตอนเกิดเหตุ (ภาพยังเข้ารหัสระหว่างทาง คนนอกดูไม่ได้)")) return false;
+  if (m.value === "raw" && !confirm(`ให้ "${where}" เป็นภาพจริง ปิดหน้า?\n\nเห็นภาพห้องจริงทั้งหมด แต่ใบหน้าถูกปิดไว้`)) return false;
+  toast("กำลังเปลี่ยน " + where + " เป็น " + m.label + "…");
+  const res = await pcCommand({ cmd: "mode", mode: m.value, id: camId });
   if (!res || res.ok === false) {
     toast(res && res.error ? res.error : "เปลี่ยนไม่ได้ - ต่อคอมไม่ได้", 4000);
     return false;
@@ -679,7 +700,9 @@ async function setMode(m) {
     M.state = res;
     if (S.view === "manage") renderManage();
   }
-  toast("✓ เปลี่ยนเป็น " + m.label + " แล้ว");
+  await refreshCams();
+  renderModeButton();
+  toast("✓ " + where + " เป็น " + m.label + " แล้ว");
   return true;
 }
 
@@ -691,17 +714,21 @@ function chooseMode() {
   }
   const sheet = $("sheet");
   sheet.innerHTML = "";
-  sheet.append(el("h2", "", "ระดับการเห็นภาพ"));
-  sheet.append(el("div", "muted small", "ใช้กับทุกที่: มือถือทุกเครื่อง จอคอม และภาพตอนเกิดเหตุ"));
+  const cam = liveCams().find((x) => x.id === V.cam);
+  const current = camLevel(V.cam);
+  sheet.append(el("h2", "", V.cam === -1 ? "ระดับภาพของทุกกล้อง" : "ระดับภาพของ " + (cam ? cam.name : "กล้องนี้")));
+  sheet.append(el("div", "muted small", V.cam === -1
+    ? "เลือกแล้วทุกกล้องจะใช้ระดับนี้เหมือนกัน (ตั้งแยกแต่ละกล้องได้ โดยเลือกกล้องด้านบนก่อน)"
+    : "ใช้กับกล้องนี้เท่านั้น ทั้งในมือถือทุกเครื่อง จอคอม และภาพตอนเกิดเหตุ"));
   sheet.lastChild.style.marginBottom = "10px";
   for (const m of S.modes) {
-    const row = el("div", "opt" + (m.value === S.mode ? " on" : ""));
+    const row = el("div", "opt" + (m.value === current ? " on" : ""));
     if (m.value === "cctv") row.append(el("span", "tag", "เห็นหน้า"));
-    row.append(el("b", "", (m.value === S.mode ? "✓  " : "") + m.label));
+    row.append(el("b", "", (m.value === current ? "✓  " : "") + m.label));
     row.append(el("div", "muted small", m.desc));
     row.onclick = async () => {
       closeSheet();
-      await setMode(m);
+      await setMode(m, V.cam);
     };
     sheet.append(row);
   }
@@ -729,6 +756,7 @@ function renderChips() {
       if (c.id === V.cam) return;
       V.cam = c.id;
       renderChips();
+      renderModeButton();
       startLive();
     };
     box.append(b);
@@ -994,10 +1022,12 @@ function renderManage() {
   const st = M.state;
   const modes = $("manage-modes");
   modes.innerHTML = "";
+  const levels = new Set((st.cameras || []).map((c) => c.privacy));
+  const same = levels.size === 1 ? [...levels][0] : null;
   for (const m of st.modes || []) {
-    const row = el("div", "opt" + (m.value === st.mode ? " on" : ""));
+    const row = el("div", "opt" + (m.value === same ? " on" : ""));
     if (m.value === "cctv") row.append(el("span", "tag", "เห็นหน้า"));
-    row.append(el("b", "", (m.value === st.mode ? "✓  " : "") + m.label));
+    row.append(el("b", "", (m.value === same ? "✓  " : "") + m.label));
     row.append(el("div", "muted small", m.desc));
     row.onclick = () => pickMode(m);
     modes.append(row);
@@ -1009,6 +1039,7 @@ function renderManage() {
     row.append(el("b", "", c.name));
     const kind = c.kind === "network" ? "กล้องวงจรปิด" : c.kind === "webcam" ? "เว็บแคม" : "ไฟล์";
     row.append(el("div", "muted small", kind + " · " + c.label));
+    row.append(el("div", "small", "👁 " + modeLabel(c.privacy) + (c.privacy_own ? "" : " (ค่าเริ่มต้น)")));
     let text = "● เฝ้าอยู่", color = "var(--ok)";
     if (!c.ok && c.connecting) { text = "● กำลังเชื่อมต่อ…"; color = "var(--warn)"; }
     else if (!c.ok) { text = "● ใช้ไม่ได้" + (c.error ? ": " + c.error : ""); color = "var(--alert)"; }
@@ -1021,8 +1052,7 @@ function renderManage() {
 }
 
 function pickMode(m) {
-  S.mode = M.state.mode;
-  setMode(m);
+  setMode(m, -1);         // หัวข้อ "ใช้ระดับเดียวกันทุกกล้อง"
 }
 
 function closeSheet() {
@@ -1046,6 +1076,18 @@ function editSheet(cam) {
   source.autocomplete = "off";
   source.spellcheck = false;
   sheet.append(name, source);
+  // ระดับภาพของกล้องนี้
+  const level = el("select");
+  level.className = "search";
+  level.style.marginBottom = "8px";
+  const opts = [["default", "ระดับภาพ: ตามค่าเริ่มต้น"]].concat(S.modes.map((m) => [m.value, "ระดับภาพ: " + m.label]));
+  for (const [v, t] of opts) {
+    const o = el("option", "", t);
+    o.value = v;
+    level.append(o);
+  }
+  level.value = cam && cam.privacy_own ? cam.privacy : "default";
+  sheet.append(level);
   sheet.append(el("div", "muted small", "เว็บแคมที่เสียบกับคอม: ใส่เลข หรือกด \"ค้นหาเว็บแคม\"\n"
     + "กล้องวงจรปิด: rtsp://ชื่อผู้ใช้:รหัสผ่าน@ไอพีกล้อง:554/... (Tapo: แอป Tapo → ตั้งค่ากล้อง → บัญชีกล้อง)"));
   sheet.lastChild.style.whiteSpace = "pre-line";
@@ -1069,8 +1111,9 @@ function editSheet(cam) {
   const save = el("button", "primary", adding ? "เพิ่ม" : "บันทึก");
   save.onclick = async () => {
     closeSheet();
-    await manageRun(Object.assign({ cmd: adding ? "add" : "edit", name: name.value.trim(), source: source.value.trim() },
-      adding ? {} : { id: cam.id }), adding ? "กำลังเพิ่มกล้อง…" : "กำลังบันทึก…");
+    if (level.value === "cctv" && !confirm("ให้กล้องนี้เป็นกล้องวงจรปิด (เห็นหน้าคน)?")) return;
+    await manageRun(Object.assign({ cmd: adding ? "add" : "edit", name: name.value.trim(), source: source.value.trim(),
+      privacy: level.value }, adding ? {} : { id: cam.id }), adding ? "กำลังเพิ่มกล้อง…" : "กำลังบันทึก…");
   };
   sheet.append(save);
   if (!adding) {
