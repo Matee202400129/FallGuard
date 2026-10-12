@@ -6,7 +6,7 @@
  */
 importScripts("crypto.js");
 
-const CACHE = "fallguard-v2";
+const CACHE = "fallguard-v3";
 const SHELL = ["./", "index.html", "app.js", "crypto.js", "vendor/jsQR.js", "manifest.webmanifest",
                "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
@@ -21,18 +21,24 @@ self.addEventListener("activate", (e) => {
   })());
 });
 
-// เปิดแอปได้เร็วแม้เน็ตช้า: ใช้ไฟล์ในเครื่องก่อน แล้วอัปเดตจากเว็บเบื้องหลัง
+// โหลดจากเว็บก่อนเสมอ (อัปเดตแอปแล้วเห็นทันทีตั้งแต่เปิดครั้งแรก)
+// เน็ตไม่มี/ช้าเกิน 4 วินาที ค่อยใช้ไฟล์ที่เก็บไว้ในเครื่อง แอปจะยังเปิดได้
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(e.request, { ignoreSearch: true });
-    const fresh = fetch(e.request).then((r) => {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 4000);
+      const r = await fetch(e.request, { cache: "no-store", signal: ctl.signal });
+      clearTimeout(timer);
       if (r.ok) cache.put(e.request, r.clone());
       return r;
-    }).catch(() => cached);
-    return cached || fresh;
+    } catch (err) {
+      const cached = await cache.match(e.request, { ignoreSearch: true });
+      return cached || Response.error();
+    }
   })());
 });
 

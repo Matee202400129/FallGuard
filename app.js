@@ -79,6 +79,8 @@ const S = {
   connected: false,
   connState: "กำลังเชื่อมต่อ…",
   snap: null,          // ภาพนิ่งล่าสุดที่ขอผ่านเน็ต {ts, cams:[{id,name,jpeg}]}
+  mode: store.get("mode", ""),     // ระดับการเห็นภาพปัจจุบันบนคอม
+  modes: store.get("modes", []),
   view: "",
 };
 if (!S.dev) {
@@ -357,6 +359,7 @@ async function pollOverview() {
       delete c.thumb;
     }
     S.live = { cams: o.cams, at: Date.now() };
+    noteMode(o);
   }
   renderCameras();
 }
@@ -630,7 +633,82 @@ function openLive(cam) {
   V.cam = cam;
   show("live");
   renderChips();
+  renderModeButton();
   startLive();
+  pcGet("info").then((o) => {
+    if (o) noteMode(o);
+  });
+}
+
+// ---------------------------------------------------- ระดับการเห็นภาพ
+function noteMode(o) {
+  if (o.mode) {
+    S.mode = o.mode;
+    store.set("mode", o.mode);
+  }
+  if (o.modes && o.modes.length) {
+    S.modes = o.modes;
+    store.set("modes", o.modes);
+  }
+  renderModeButton();
+}
+
+function modeLabel(value) {
+  const m = S.modes.find((x) => x.value === value);
+  return m ? m.label : "…";
+}
+
+function renderModeButton() {
+  $("live-mode").textContent = "👁 ระดับภาพ: " + (S.mode ? modeLabel(S.mode) : "…");
+}
+
+/** เปลี่ยนระดับการเห็นภาพ (มีผลทุกที่) - ระดับที่เห็นภาพจริงต้องยืนยันก่อน */
+async function setMode(m) {
+  if (m.value === S.mode) return true;
+  if (m.value === "cctv" && !confirm("เปลี่ยนเป็น \"กล้องวงจรปิด\"?\n\nภาพจริงทั้งหมด เห็นหน้าคนชัดเจน จะเห็นหน้าทุกที่: "
+      + "มือถือทุกเครื่องที่จับคู่ จอคอม และภาพตอนเกิดเหตุ (ภาพยังเข้ารหัสระหว่างทาง คนนอกดูไม่ได้)")) return false;
+  if (m.value === "raw" && !confirm("เปลี่ยนเป็น \"ภาพจริง ปิดหน้า\"?\n\nเห็นภาพห้องจริงทั้งหมด แต่ใบหน้าถูกปิดไว้")) return false;
+  toast("กำลังเปลี่ยนเป็น " + m.label + "…");
+  const res = await pcCommand({ cmd: "mode", mode: m.value });
+  if (!res || res.ok === false) {
+    toast(res && res.error ? res.error : "เปลี่ยนไม่ได้ - ต่อคอมไม่ได้", 4000);
+    return false;
+  }
+  noteMode(res);
+  if (res.cameras) {
+    M.state = res;
+    if (S.view === "manage") renderManage();
+  }
+  toast("✓ เปลี่ยนเป็น " + m.label + " แล้ว");
+  return true;
+}
+
+function chooseMode() {
+  if (!S.modes.length) {
+    toast("ยังไม่ได้ข้อมูลจากคอม - ลองอีกครั้ง");
+    pcGet("info").then((o) => o && noteMode(o));
+    return;
+  }
+  const sheet = $("sheet");
+  sheet.innerHTML = "";
+  sheet.append(el("h2", "", "ระดับการเห็นภาพ"));
+  sheet.append(el("div", "muted small", "ใช้กับทุกที่: มือถือทุกเครื่อง จอคอม และภาพตอนเกิดเหตุ"));
+  sheet.lastChild.style.marginBottom = "10px";
+  for (const m of S.modes) {
+    const row = el("div", "opt" + (m.value === S.mode ? " on" : ""));
+    if (m.value === "cctv") row.append(el("span", "tag", "เห็นหน้า"));
+    row.append(el("b", "", (m.value === S.mode ? "✓  " : "") + m.label));
+    row.append(el("div", "muted small", m.desc));
+    row.onclick = async () => {
+      closeSheet();
+      await setMode(m);
+    };
+    sheet.append(row);
+  }
+  const cancel = el("button", "", "ปิด");
+  cancel.onclick = closeSheet;
+  sheet.append(cancel);
+  $("sheet-bg").hidden = false;
 }
 
 function liveCams() {
@@ -728,9 +806,13 @@ async function streamOnce(ctl) {
     ctx.drawImage(src, 0, 0, w, h);
     rendered = true;
     meter.frames++;
-    const secs = Math.max(0.001, (Date.now() - meter.since) / 1000);
-    liveStatus(`● ${video ? "วิดีโอสด" : "ภาพสด"} ผ่านอินเทอร์เน็ต · ${(meter.frames / secs).toFixed(0)} ภาพ/วินาที · ใช้เน็ตราว ${(meter.bytes / secs * 3600 / 1048576).toFixed(0)} MB/ชั่วโมง`, "var(--ok)");
-    if (Date.now() - meter.since > 3000) Object.assign(meter, { since: Date.now(), frames: 0, bytes: 0 });
+    // คำนวณจากช่วงเวลาที่ครบแล้วเท่านั้น (ช่วงสั้นๆ หลังเริ่มนับใหม่หารด้วยเวลาเกือบศูนย์ ตัวเลขพุ่งเป็นพัน)
+    const secs = (Date.now() - meter.since) / 1000;
+    if (secs >= 2) {
+      meter.text = `● ${video ? "วิดีโอสด" : "ภาพสด"} ผ่านอินเทอร์เน็ต · ${(meter.frames / secs).toFixed(0)} ภาพ/วินาที · ใช้เน็ตราว ${(meter.bytes / secs * 3600 / 1048576).toFixed(0)} MB/ชั่วโมง`;
+      Object.assign(meter, { since: Date.now(), frames: 0, bytes: 0 });
+    }
+    liveStatus(meter.text || `● ${video ? "วิดีโอสด" : "ภาพสด"} ผ่านอินเทอร์เน็ต`, "var(--ok)");
   };
 
   if (video) {
@@ -895,6 +977,7 @@ async function manageRun(cmd, busy) {
   manageStatus("เชื่อมต่อคอมแล้ว · เปลี่ยนแล้วมีผลทันที", "var(--ok)");
   if (res.cameras) {
     M.state = res;
+    noteMode(res);
     renderManage();
     S.live = null;            // ให้หน้าแรกดึงรายการกล้องใหม่
     S.thumbs = {};
@@ -938,11 +1021,8 @@ function renderManage() {
 }
 
 function pickMode(m) {
-  if (m.value === M.state.mode) return;
-  if (m.value === "cctv" && !confirm("เปลี่ยนเป็น \"กล้องวงจรปิด\"?\n\nภาพจริงทั้งหมด เห็นหน้าคนชัดเจน จะเห็นหน้าทุกที่: "
-      + "มือถือทุกเครื่องที่จับคู่ จอคอม และภาพตอนเกิดเหตุ (ภาพยังเข้ารหัสระหว่างทาง คนนอกดูไม่ได้)")) return;
-  if (m.value === "raw" && !confirm("เปลี่ยนเป็น \"ภาพจริง ปิดหน้า\"?\n\nเห็นภาพห้องจริงทั้งหมด แต่ใบหน้าถูกปิดไว้")) return;
-  manageRun({ cmd: "mode", mode: m.value }, "กำลังเปลี่ยนเป็น " + m.label + "…");
+  S.mode = M.state.mode;
+  setMode(m);
 }
 
 function closeSheet() {
@@ -1162,6 +1242,11 @@ $("live-back").onclick = () => {
 };
 $("live-snap").onclick = requestSnapshot;
 $("btn-manage").onclick = openManage;
+$("live-mode").onclick = chooseMode;
+$("live-manage").onclick = () => {
+  stopLive();
+  openManage();
+};
 $("manage-back").onclick = () => show("home");
 $("manage-add").onclick = () => editSheet(null);
 $("sheet-bg").onclick = (e) => { if (e.target === $("sheet-bg")) closeSheet(); };
