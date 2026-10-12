@@ -814,7 +814,7 @@ async function streamOnce(ctl) {
   const t = Math.floor(Date.now() / 1000);
   const wantH264 = !V.h264Broken && "VideoDecoder" in window;
   const url = `${S.pc.tunnel}/m/live?cam=${cam}&t=${t}&s=${await S.proto.sign("live|" + cam + "|" + t)}&q=low`
-    + (wantH264 ? "&fmt=h264" : "");
+    + (wantH264 ? "&fmt=h264&v=2" : "");
   const r = await fetch(url, { signal: ctl.signal, cache: "no-store" });
   if (!r.ok) throw new Error("คอมตอบ " + r.status);
   const video = r.headers.get("X-Format") === "h264";
@@ -852,7 +852,26 @@ async function streamOnce(ctl) {
       error: (e) => { V.decodeError = e; },
     });
   }
-  let configured = false, ts = 0;
+  let configured = false, ts = 0, stamped = false, timer = null;
+  // ภาพที่รอถึงเวลาแสดง: เน็ตมือถือส่งมาเป็นพักๆ (บางทีห่าง 100 ms แล้วมาติดกัน 3 ภาพ)
+  // ถ้าแสดงทันทีที่มาถึง ภาพจะเดินกระตุกตามเน็ต - รอนิดหนึ่งแล้วปล่อยตามจังหวะที่กล้องถ่ายจริง
+  const queue = [];
+  const play = V.play = new Playout();
+  const decoder = V.decoder;
+  const feed = () => {
+    timer = null;
+    if (V.decoder !== decoder) return;     // สายนี้จบแล้ว (เปลี่ยนกล้อง/ต่อใหม่) ภาพที่ค้างทิ้งไป
+    while (queue.length && queue[0].due <= performance.now() + 3) {
+      const p = queue.shift();
+      try {
+        decoder.decode(new EncodedVideoChunk({ type: p.key ? "key" : "delta", timestamp: p.ts, data: p.data }));
+      } catch (e) {
+        V.decodeError = e;        // ตัวถอดถูกปิดไปแล้ว (เปลี่ยนกล้อง) หรือเสีย - ลูปอ่านจะจัดการต่อ
+        return;
+      }
+    }
+    if (queue.length) timer = setTimeout(feed, Math.max(0, queue[0].due - performance.now()));
+  };
   for (;;) {
     const { value, done } = await reader.read();
     if (done) throw new Error("สายหลุด");
@@ -873,8 +892,13 @@ async function streamOnce(ctl) {
         continue;
       }
       const kind = String.fromCharCode(msg[0]);
-      const body = msg.subarray(1);
-      if (kind === "C") continue;
+      if (kind === "C") {
+        try { stamped = !!JSON.parse(new TextDecoder().decode(msg.subarray(1))).ts; } catch (e) { stamped = false; }
+        continue;
+      }
+      // คอมรุ่นใหม่แนบเวลาที่กล้องถ่าย (มิลลิวินาที 4 ไบต์) ไว้หน้าข้อมูลวิดีโอ
+      const shot = stamped ? new DataView(msg.buffer, msg.byteOffset + 1, 4).getUint32(0) : null;
+      const body = msg.subarray(stamped ? 5 : 1);
       if (!configured) {
         if (kind !== "K") continue;
         const codec = avcCodec(body);
@@ -896,14 +920,43 @@ async function streamOnce(ctl) {
         err.h264 = true;
         throw err;
       }
-      ts += 66666;
-      V.decoder.decode(new EncodedVideoChunk({ type: kind === "K" ? "key" : "delta", timestamp: ts, data: body }));
+      ts = shot === null ? ts + 33333 : shot * 1000;
+      const now = performance.now();
+      queue.push({ key: kind === "K", ts, data: body, due: shot === null ? now : play.due(shot, now) });
+      if (!timer) feed();
       if (!rendered && Date.now() - firstKey > 4000) {
         const err = new Error("วิดีโอไม่ขึ้นภาพ");
         err.h264 = true;
         throw err;
       }
     }
+  }
+}
+
+/**
+ * จัดจังหวะแสดงภาพ (jitter buffer แบบเดียวกับแอปกล้องทั่วไป)
+ *
+ * ภาพแต่ละภาพมีเวลาที่กล้องถ่าย เราแสดงมันที่ "เวลาถ่าย + ระยะรอคงที่" ภาพจึงห่างกันเท่าตอนถ่าย
+ * ระยะรอปรับเอง: เน็ตนิ่ง = รอน้อย (ภาพสดแทบทันที), เน็ตแกว่ง = รอมากขึ้นพอให้ภาพไม่สะดุด
+ *   base  = (เวลาที่มาถึง - เวลาถ่าย) ที่น้อยที่สุดที่เคยเห็น = ภาพที่มาเร็วที่สุด
+ *   late  = ภาพนี้มาช้ากว่าภาพที่เร็วที่สุดเท่าไร - เก็บไว้ 3 วินาทีล่าสุด
+ *   delay = ช้าสุดใน 3 วินาทีนั้น + เผื่อ 25 ms (ขึ้นทันที ลงช้าๆ ไม่ให้ภาพกระโดด)
+ */
+class Playout {
+  constructor() {
+    this.base = null;
+    this.delay = 60;
+    this.late = [];
+  }
+
+  due(shot, now) {
+    const off = now - shot;
+    if (this.base === null || off < this.base) this.base = off;
+    this.late.push(off - this.base);
+    if (this.late.length > 90) this.late.shift();
+    const target = Math.min(700, Math.max(40, Math.max(...this.late) + 25));
+    this.delay = target > this.delay ? target : this.delay + (target - this.delay) * 0.01;
+    return this.base + shot + this.delay;
   }
 }
 
