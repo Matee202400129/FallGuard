@@ -554,7 +554,7 @@ function renderHistory() {
       img.src = e._img;
       c.append(img);
     } else if (e.image && e._att) loadEventImage(e);
-    let meta = ago(e.ts);
+    let meta = ago(e.ts) + "  ·  " + thaiDateTime(e.ts, false);
     if (e.acked) meta += "  ·  รับทราบแล้ว" + (e.acked_by ? "โดย " + e.acked_by : "");
     else if (e.alert) meta += "  ·  ยังไม่มีใครรับทราบ";
     c.append(el("div", "muted small", meta));
@@ -607,7 +607,7 @@ function openAlert(id) {
   S.alertId = id;
   $("al-title").textContent = (e.test ? "[ทดสอบ] " : "") + (e.title || "ตรวจพบคนล้ม") + (e.repeat ? " (เตือนซ้ำ)" : "");
   $("al-msg").textContent = e.message || "";
-  $("al-meta").textContent = "เวลา " + new Date((e.ts || 0) * 1000).toLocaleTimeString("th-TH");
+  $("al-meta").textContent = thaiDateTime(e.ts || 0, true);
   $("al-img").hidden = true;
   $("al-img-hint").textContent = e.image ? "กำลังโหลดภาพตอนเกิดเหตุ…" : "";
   if (e._img) showAlertImage(e);
@@ -1233,6 +1233,14 @@ function el(tag, cls, text) {
 
 function hhmm(ms) {
   return new Date(ms).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** วันที่และเวลาแบบไทย เช่น "15 ต.ค. 2569 14:32:07" (ภาษาไทยใช้ปี พ.ศ. ให้เอง) */
+function thaiDateTime(ts, seconds) {
+  return new Date(ts * 1000).toLocaleString("th-TH", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", second: seconds ? "2-digit" : undefined,
+  });
 }
 
 function ago(ts) {
