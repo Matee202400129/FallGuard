@@ -7,13 +7,14 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="FallGuard">
-<meta name="theme-color" content="#e5eaf1">
+<meta name="theme-color" content="#e5eaf1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#252932" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>FallGuard</title>
 <style>
-  /* Soft UI (neumorphism): พื้นเทาอมฟ้าสีเดียว ทุกอย่างปั้นจากพื้นด้วยเงาสว่างซ้ายบน + เงามืดขวาล่าง
+  /* Soft UI (neumorphism) สว่าง/มืดตามเครื่อง: พื้นสีเดียว ทุกอย่างปั้นจากพื้นด้วยเงาสว่างซ้ายบน + เงามืดขวาล่าง
      นูน = กดได้ (การ์ด ปุ่ม)  บุ๋ม = ช่องใส่ข้อมูล หรือปุ่มที่กดอยู่
      ตัวหนังสือเข้มบนพื้นสว่าง (ต่างสีเกิน 12 เท่า ตัวหนังสือรองเกิน 5 เท่า) ปุ่มหลักและตัวเลือกที่เลือกอยู่มีสีทึบ
      เพราะเงาอย่างเดียวจางเกินไปสำหรับคนสายตาไม่ดี
@@ -27,6 +28,18 @@
     --text: #1e293b; --muted: #556074; --ok: #047857; --warn: #a16207; --trouble: #c2410c;
     --alert: #dc2626; --accent: #4338ca; --danger: #dc2626;
     --grad: linear-gradient(135deg, #2563eb, #4f46e5);
+  }
+  /* โหมดมืด: ตามการตั้งค่าของ iPhone (ตั้งค่า > จอภาพและความสว่าง) พื้นเทาเข้ม เงาสว่างจางลง */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #252932; --well: #1f222a;
+      --sh-d: rgba(10,12,16,.85); --sh-l: rgba(60,66,80,.55);
+      --text: #e8ecf3; --muted: #9ea8ba; --ok: #34d399; --warn: #fbbf24; --trouble: #fb923c;
+      --alert: #f87171; --accent: #a5b4fc;
+      --toast-bg: #e8ecf3; --toast-fg: #1e293b; --scrim: rgba(0,0,0,.55);
+      color-scheme: dark;
+    }
+    .opt .tag { background: #78350f; color: #fde68a; }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { margin: 0; background: var(--bg); color: var(--text); }
@@ -140,7 +153,7 @@
   .camrow { border-radius: 16px; padding: 12px 15px; margin-bottom: 12px; cursor: pointer; }
   .camrow:active, .opt:active, .sheet .found:active { box-shadow: var(--inset); }
   .manage-btn { width: auto; padding: 7px 14px; border-radius: 14px; font-size: 16px; font-weight: 700; margin-left: 10px; }
-  .sheet-bg { position: fixed; inset: 0; background: rgba(30,41,59,.38); z-index: 15; display: flex; align-items: flex-end; }
+  .sheet-bg { position: fixed; inset: 0; background: var(--scrim, rgba(30,41,59,.38)); z-index: 15; display: flex; align-items: flex-end; }
   .sheet { background: var(--bg); width: 100%; border-radius: 24px 24px 0 0; padding: 20px 16px calc(18px + env(safe-area-inset-bottom));
            max-height: 90vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(30,41,59,.25); }
   .sheet input { margin-bottom: 10px; }
@@ -151,7 +164,7 @@
   .levels .chip.on { background: var(--grad); color: #fff; }
   .levels .chip + .chip { margin-top: 0; }
   .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
-           background: #1e293b; color: #f8fafc; padding: 11px 17px; border-radius: 16px; z-index: 20; max-width: 90vw;
+           background: var(--toast-bg, #1e293b); color: var(--toast-fg, #f8fafc); padding: 11px 17px; border-radius: 16px; z-index: 20; max-width: 90vw;
            box-shadow: 0 10px 26px rgba(30,41,59,.4); }   /* ข้อความแวบเดียว ต้องเด่นจากพื้น จึงเป็นสีเข้มทึบ */
 </style>
 </head>
