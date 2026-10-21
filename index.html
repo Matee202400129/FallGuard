@@ -15,37 +15,39 @@
 <style>
   :root {
     --bg: #0f1218; --card: #1b202a; --card2: #262d3a; --line: #2c3442;
-    --text: #e8ecf2; --muted: #96a0af; --ok: #3ddc84; --warn: #ffb020;
-    --alert: #ff4d4f; --accent: #4c8dff;
+    --text: #e8ecf2; --muted: #a3acba; --ok: #3ddc84; --warn: #ffb020; --trouble: #ff8a3d;
+    --alert: #ff4d4f; --accent: #2563eb; --danger: #dc2626;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text); }
   body {
-    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Leelawadee UI", Tahoma, sans-serif;
+    font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Leelawadee UI", Tahoma, sans-serif;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
              max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     -webkit-user-select: none; user-select: none;
   }
   [hidden] { display: none !important; }
   h1 { font-size: 28px; margin: 4px 0 0; letter-spacing: .2px; }
-  h2 { font-size: 18px; margin: 0; }
+  h2 { font-size: 20px; margin: 0; }
   .sub { color: var(--muted); margin: 2px 0 14px; }
   .muted { color: var(--muted); }
-  .small { font-size: 13px; }
+  .small { font-size: 15px; }
   .card { background: var(--card); border-radius: 14px; padding: 13px 14px; margin-bottom: 10px; }
   .row { display: flex; align-items: center; gap: 10px; }
   .grow { flex: 1; min-width: 0; }
   .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--muted); }
   .dot.s { width: 8px; height: 8px; }
   button, .btn {
-    font: inherit; font-size: 15px; border: 0; border-radius: 12px; padding: 12px 14px; width: 100%;
+    font: inherit; font-size: 17px; border: 0; border-radius: 12px; padding: 13px 14px; width: 100%;
     background: var(--card2); color: var(--text); cursor: pointer; display: block; text-align: center;
   }
   button.primary { background: var(--accent); color: #fff; font-weight: 600; }
-  button.danger { background: var(--alert); color: #fff; font-weight: 700; }
+  button.danger { background: var(--danger); color: #fff; font-weight: 700; }
+  button.link-danger { background: transparent; color: var(--alert); font-weight: 600; margin-top: 18px; }
   button.warn { background: var(--warn); color: #111; font-weight: 600; }
   button:active { opacity: .75; }
   button + button { margin-top: 8px; }
+  .row > button + button { margin-top: 0; }        /* ปุ่มเรียงแนวนอนต้องสูงเท่ากัน */
   .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; }
   input.search {
     width: 100%; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--card2);
@@ -59,7 +61,7 @@
          border: 1px solid transparent; }
   .cam.wide { grid-column: 1 / -1; }
   .cam.fallen { border: 2px solid var(--alert); }
-  .cam.offline { border-color: rgba(255,77,79,.45); }
+  .cam.offline { border-color: rgba(255,138,61,.6); }
   .cam .media { position: relative; background: #000; height: 104px; display: flex; align-items: center; justify-content: center; }
   .cam.wide .media { height: 170px; }
   .cam.wide.tall .media { height: 150px; }
@@ -71,13 +73,13 @@
   .cam .tile { background: #000; overflow: hidden; }
   .cam .tile.off img { opacity: .35; }
   .cam .off { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-              color: var(--alert); font-weight: 700; }
-  .pill { position: absolute; top: 8px; padding: 3px 8px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; }
+              color: var(--trouble); font-weight: 700; }
+  .pill { position: absolute; top: 8px; padding: 3px 8px; border-radius: 10px; font-size: 14px; font-weight: 700; color: #fff; }
   .pill.people { right: 8px; background: rgba(0,0,0,.66); }
   .pill.alarm { left: 8px; background: var(--alert); }
   .cam .info { padding: 9px 12px 11px; }
   .cam .name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cam .st { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cam .st { color: var(--muted); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* ประวัติ */
   .ev .t { font-weight: 700; }
@@ -86,11 +88,11 @@
   /* ดูกล้อง */
   .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
-  .chip { flex: none; width: auto; padding: 8px 15px; border-radius: 18px; background: var(--card); white-space: nowrap; font-size: 14px; }
+  .chip { flex: none; width: auto; padding: 8px 15px; border-radius: 18px; background: var(--card); white-space: nowrap; font-size: 16px; }
   .chip.on { background: var(--accent); color: #fff; }
   .screen { background: #000; border-radius: 12px; overflow: hidden; position: relative; aspect-ratio: 4 / 3; }
   .screen canvas, .screen img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .live-status { margin-top: 10px; font-size: 15px; }
+  .live-status { margin-top: 10px; font-size: 17px; }
   .back { width: auto; display: inline-block; padding: 8px 14px; margin-bottom: 10px; }
 
   /* แจ้งเตือนเต็มจอ */
@@ -112,14 +114,20 @@
   /* จัดการกล้อง */
   .opt { background: var(--card); border-radius: 14px; padding: 11px 14px; margin-bottom: 8px; border: 2px solid transparent; cursor: pointer; }
   .opt.on { border-color: var(--accent); }
-  .opt .tag { float: right; background: var(--warn); color: #111; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
+  .opt .tag { float: right; background: var(--warn); color: #111; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
   .camrow { background: var(--card); border-radius: 14px; padding: 11px 14px; margin-bottom: 8px; cursor: pointer; }
-  .manage-btn { width: auto; padding: 6px 12px; border-radius: 14px; font-size: 14px; font-weight: 700; margin-left: 10px; }
+  .manage-btn { width: auto; padding: 7px 13px; border-radius: 14px; font-size: 16px; font-weight: 700; margin-left: 10px; }
   .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 15; display: flex; align-items: flex-end; }
   .sheet { background: #161b24; width: 100%; border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); max-height: 90vh; overflow-y: auto; }
   .sheet input { width: 100%; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--card2); border-radius: 12px;
                  padding: 11px 13px; margin-bottom: 8px; -webkit-user-select: text; user-select: text; }
   .sheet .found { background: var(--card); border-radius: 12px; padding: 10px 13px; margin-bottom: 6px; cursor: pointer; }
+  .sheet label { display: block; font-weight: 700; margin: 12px 0 6px; }
+  .sheet .hint { color: var(--muted); font-size: 15px; margin: -2px 0 8px; }
+  .levels { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .levels .chip { background: var(--card2); }
+  .levels .chip.on { background: var(--accent); color: #fff; }
+  .levels .chip + .chip { margin-top: 0; }
   .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
            background: #222b38; color: var(--text); padding: 10px 16px; border-radius: 12px; z-index: 20; max-width: 90vw;
            box-shadow: 0 6px 24px rgba(0,0,0,.4); }

@@ -384,13 +384,12 @@ function silentTooLong() {
 function renderHome() {
   $("home-name").textContent = (S.pair && S.pair.n) || "แจ้งเตือนคนล้ม";
   let title, color = "var(--ok)";
-  const home = (S.pair && S.pair.n) || "บ้าน";
-  if (!S.connected) { title = "ยังต่อเน็ตไม่ได้ - อาจพลาดแจ้งเตือน"; color = "var(--alert)"; }
-  else if (!S.pc.state) { title = "รอสัญญาณจากคอมที่ " + home; color = "var(--warn)"; }
-  else if (S.pc.state === "stopped") { title = "คอมหยุดเฝ้าระวัง " + home + " อยู่"; color = "var(--warn)"; }
-  else if (silentTooLong()) { title = "ไม่ได้ยินจากคอมที่ " + home + " นานผิดปกติ"; color = "var(--alert)"; }
-  else if (S.pc.paused) { title = "หยุดตรวจจับชั่วคราวที่ " + home; color = "var(--warn)"; }
-  else title = "กำลังเฝ้าระวัง " + home;
+  if (!S.connected) { title = "ยังต่อเน็ตไม่ได้ - อาจพลาดแจ้งเตือน"; color = "var(--trouble)"; }
+  else if (!S.pc.state) { title = "รอสัญญาณจากคอม"; color = "var(--warn)"; }
+  else if (S.pc.state === "stopped") { title = "คอมหยุดเฝ้าระวังอยู่"; color = "var(--warn)"; }
+  else if (silentTooLong()) { title = "ไม่ได้ยินจากคอมนานผิดปกติ"; color = "var(--trouble)"; }
+  else if (S.pc.paused) { title = "หยุดตรวจจับชั่วคราว"; color = "var(--warn)"; }
+  else title = "กำลังเฝ้าระวัง";
   $("st-title").textContent = title;
   $("st-dot").style.background = color;
   let detail = "ได้ยินจากคอมล่าสุด: " + (S.pc.heard ? ago(S.pc.heard) : "ยังไม่เคย");
@@ -446,7 +445,7 @@ function renderCameras() {
   const all = cams.find((c) => c.id === -1);
   $("cam-title").textContent = singles.length ? `กล้อง · ${singles.length} ตัว` : "กล้อง";
   const upd = $("cam-updated");
-  if (liveOk) { upd.textContent = "● สด"; upd.style.color = "var(--ok)"; }
+  if (liveOk) { upd.textContent = "● อัปเดตสด"; upd.style.color = "var(--ok)"; }
   else if (S.live) { upd.textContent = "ข้อมูลเมื่อ " + hhmm(S.live.at); upd.style.color = ""; }
   else { upd.textContent = singles.length ? "ข้อมูลล่าสุดจากคอม" : ""; upd.style.color = ""; }
   const search = $("cam-search");
@@ -517,7 +516,7 @@ function camCard(cam, wide, count, singles) {
   const row = el("div", "row");
   row.style.gap = "6px";
   const dot = el("span", "dot s");
-  dot.style.background = ok ? stateColor(cam.state) : "var(--alert)";
+  dot.style.background = ok ? stateColor(cam.state) : "var(--trouble)";
   let sub = ok ? stateLabel(cam.state) : "ขาดการเชื่อมต่อ";
   if (cam.people !== undefined) {
     const n = cam.people === 0 ? "ไม่มีคน" : cam.people + " คน";
@@ -543,7 +542,7 @@ function renderHistory() {
     let color = "var(--alert)";
     if (e.kind === "recovered") { t = "ลุกขึ้นได้แล้ว"; color = "var(--ok)"; }
     if (e.kind === "near_fall") { t = "ทรุดแต่ลุกเองได้"; color = "var(--warn)"; }
-    if (e.kind === "power_lost") color = "var(--warn)";
+    if (e.kind === "power_lost" || e.kind === "camera_lost") color = "var(--trouble)";
     if (e.kind === "power_back") color = "var(--ok)";
     if (e.test) t = "[ทดสอบ] " + t;
     const tt = el("div", "t", t);
@@ -839,10 +838,12 @@ async function streamOnce(ctl) {
     // คำนวณจากช่วงเวลาที่ครบแล้วเท่านั้น (ช่วงสั้นๆ หลังเริ่มนับใหม่หารด้วยเวลาเกือบศูนย์ ตัวเลขพุ่งเป็นพัน)
     const secs = (Date.now() - meter.since) / 1000;
     if (secs >= 2) {
-      meter.text = `● ${video ? "วิดีโอสด" : "ภาพสด"} ผ่านอินเทอร์เน็ต · ${(meter.frames / secs).toFixed(0)} ภาพ/วินาที · ใช้เน็ตราว ${(meter.bytes / secs * 3600 / 1048576).toFixed(0)} MB/ชั่วโมง`;
+      meter.text = `● ${video ? "วิดีโอสด" : "ภาพสด"} · ${(meter.frames / secs).toFixed(0)}\u00a0ภาพ/วินาที`;
+      meter.detail = `ผ่านอินเทอร์เน็ต · ใช้เน็ตราว ${(meter.bytes / secs * 3600 / 1048576).toFixed(0)}\u00a0MB/ชั่วโมง`;
       Object.assign(meter, { since: Date.now(), frames: 0, bytes: 0 });
+      $("live-detail").textContent = meter.detail;
     }
-    liveStatus(meter.text || `● ${video ? "วิดีโอสด" : "ภาพสด"} ผ่านอินเทอร์เน็ต`, "var(--ok)");
+    liveStatus(meter.text || `● ${video ? "วิดีโอสด" : "ภาพสด"}`, "var(--ok)");
   };
 
   if (video) {
@@ -1055,8 +1056,8 @@ function manageStatus(text, color) {
 async function manageRun(cmd, busy) {
   manageStatus(busy, "var(--warn)");
   const res = await pcCommand(cmd);
-  if (!res) return manageStatus("ต่อคอมไม่ได้ - ต้องเปิดเฝ้าระวังบนคอมไว้ (และเปิดภาพสดนอกบ้าน)", "var(--alert)"), null;
-  if (res.ok === false) return manageStatus(res.error || "คอมทำคำสั่งนี้ไม่สำเร็จ", "var(--alert)"), res;
+  if (!res) return manageStatus("ต่อคอมไม่ได้ - ต้องเปิดเฝ้าระวังบนคอมไว้ (และเปิดภาพสดนอกบ้าน)", "var(--trouble)"), null;
+  if (res.ok === false) return manageStatus(res.error || "คอมทำคำสั่งนี้ไม่สำเร็จ", "var(--trouble)"), res;
   manageStatus("เชื่อมต่อคอมแล้ว · เปลี่ยนแล้วมีผลทันที", "var(--ok)");
   if (res.cameras) {
     M.state = res;
@@ -1092,12 +1093,11 @@ function renderManage() {
   for (const c of st.cameras || []) {
     const row = el("div", "camrow");
     row.append(el("b", "", c.name));
-    const kind = c.kind === "network" ? "กล้องวงจรปิด" : c.kind === "webcam" ? "เว็บแคม" : "ไฟล์";
-    row.append(el("div", "muted small", kind + " · " + c.label));
+    row.append(el("div", "muted small", sourceText(c)));
     row.append(el("div", "small", "👁 " + modeLabel(c.privacy) + (c.privacy_own ? "" : " (ค่าเริ่มต้น)")));
     let text = "● เฝ้าอยู่", color = "var(--ok)";
     if (!c.ok && c.connecting) { text = "● กำลังเชื่อมต่อ…"; color = "var(--warn)"; }
-    else if (!c.ok) { text = "● ใช้ไม่ได้" + (c.error ? ": " + c.error : ""); color = "var(--alert)"; }
+    else if (!c.ok) { text = "● ใช้ไม่ได้" + (c.error ? ": " + c.error : ""); color = "var(--trouble)"; }
     const s = el("div", "small", text);
     s.style.color = color;
     row.append(s);
@@ -1108,6 +1108,18 @@ function renderManage() {
 
 function pickMode(m) {
   setMode(m, -1);         // หัวข้อ "ใช้ระดับเดียวกันทุกกล้อง"
+}
+
+/** แหล่งภาพเป็นคำที่อ่านเข้าใจ: เว็บแคม ตัวที่ 1 / กล้อง Wi-Fi 192.168.1.20 (ไม่โชว์รหัสผ่าน) */
+function sourceText(c) {
+  const label = String(c.label || "");
+  const n = label.match(/^webcam (\d+)$/);
+  if (n) return "เว็บแคม ตัวที่ " + (Number(n[1]) + 1);
+  const net = label.match(/^([a-z][\w+.-]*):\/\/(?:[^/@]*@)?\[?([^/\]:]+)/i);
+  if (net) return (/^(rtsps?|rtmp)$/i.test(net[1]) ? "กล้อง Wi-Fi " : "กล้องออนไลน์ ") + net[2];
+  if (label === "จำลอง") return "ฉากจำลอง";
+  if (c.kind === "webcam") return "เว็บแคม";
+  return label || "ไฟล์";
 }
 
 function closeSheet() {
@@ -1121,58 +1133,83 @@ function editSheet(cam) {
   const sheet = $("sheet");
   sheet.innerHTML = "";
   sheet.append(el("h2", "", adding ? "เพิ่มกล้อง" : "แก้ไขกล้อง"));
-  sheet.lastChild.style.marginBottom = "12px";
+
+  sheet.append(el("label", "", "ชื่อห้อง/กล้อง (ขึ้นในแจ้งเตือน)"));
   const name = el("input");
-  name.placeholder = "ชื่อห้อง เช่น ห้องนอน (ขึ้นในแจ้งเตือน)";
+  name.placeholder = "เช่น ห้องนอนคุณแม่";
   name.value = adding ? "" : cam.name.replace(" (จำลอง)", "");
+  sheet.append(name);
+
+  // แหล่งภาพ: แตะเว็บแคมที่ค้นเจอ หรือใส่ลิงก์กล้อง Wi-Fi (ค่าที่ส่งไปคอมยังเป็นเลขเว็บแคมแบบเดิม)
+  sheet.append(el("label", "", "กล้อง"));
+  if (!adding) sheet.append(el("div", "hint", "ตอนนี้: " + sourceText(cam) + " · ไม่เปลี่ยนก็ไม่ต้องแตะ"));
+  let webcam = null;
+  const picked = el("div", "hint");
   const source = el("input");
-  source.placeholder = adding ? "เลขเว็บแคม (เช่น 1) หรือ rtsp://..." : "เว้นว่าง = ใช้แหล่งภาพเดิม";
+  source.placeholder = "ลิงก์กล้อง Wi-Fi เช่น rtsp://…";
   source.autocapitalize = "off";
   source.autocomplete = "off";
   source.spellcheck = false;
-  sheet.append(name, source);
-  // ระดับภาพของกล้องนี้
-  const level = el("select");
-  level.className = "search";
-  level.style.marginBottom = "8px";
-  const opts = [["default", "ระดับภาพ: ตามค่าเริ่มต้น"]].concat(S.modes.map((m) => [m.value, "ระดับภาพ: " + m.label]));
-  for (const [v, t] of opts) {
-    const o = el("option", "", t);
-    o.value = v;
-    level.append(o);
-  }
-  level.value = cam && cam.privacy_own ? cam.privacy : "default";
-  sheet.append(level);
-  sheet.append(el("div", "muted small", "เว็บแคมที่เสียบกับคอม: ใส่เลข หรือกด \"ค้นหาเว็บแคม\"\n"
-    + "กล้องวงจรปิด: rtsp://ชื่อผู้ใช้:รหัสผ่าน@ไอพีกล้อง:554/... (Tapo: แอป Tapo → ตั้งค่ากล้อง → บัญชีกล้อง)"));
-  sheet.lastChild.style.whiteSpace = "pre-line";
+  source.oninput = () => { webcam = null; picked.textContent = ""; };
   const found = el("div");
-  found.style.margin = "8px 0";
   const find = el("button", "", "ค้นหาเว็บแคมที่เสียบกับคอม");
   find.onclick = async () => {
     find.textContent = "กำลังค้นหา (ราว 10 วินาที)…";
     const res = await pcCommand({ cmd: "probe" });
     find.textContent = "ค้นหาเว็บแคมที่เสียบกับคอม";
     found.innerHTML = "";
-    if (!res || !res.found) return found.append(el("div", "muted small", "ค้นหาไม่ได้ - ต่อคอมไม่ได้"));
-    if (!res.found.length) return found.append(el("div", "muted small", "ไม่พบเว็บแคมเพิ่ม (ที่เสียบอยู่ถูกใช้หมดแล้ว หรือยังไม่ได้เสียบ)"));
+    if (!res || !res.found) return found.append(el("div", "hint", "ค้นหาไม่ได้ - ต่อคอมไม่ได้"));
+    if (!res.found.length) return found.append(el("div", "hint", "ไม่พบเว็บแคมเพิ่ม (ที่เสียบอยู่ถูกใช้หมดแล้ว หรือยังไม่ได้เสียบ)"));
     for (const f of res.found) {
-      const row = el("div", "found", `เว็บแคม ${f.index}  (${f.size})` + (f.black ? "  - ภาพดำ อาจไม่ใช่กล้องจริง" : "  - มีภาพ"));
-      row.onclick = () => { source.value = String(f.index); found.innerHTML = ""; };
+      const row = el("div", "found", `เว็บแคม ตัวที่ ${f.index + 1}  (${f.size})` + (f.black ? "  - ภาพดำ อาจไม่ใช่กล้องจริง" : "  - มีภาพ"));
+      row.onclick = () => {
+        webcam = f.index;
+        source.value = "";
+        found.innerHTML = "";
+        picked.textContent = `✓ เลือกเว็บแคม ตัวที่ ${f.index + 1} แล้ว`;
+      };
       found.append(row);
     }
   };
-  sheet.append(find, found);
-  const save = el("button", "primary", adding ? "เพิ่ม" : "บันทึก");
+  find.style.marginTop = "0";
+  sheet.append(find, found, picked, source);
+  sheet.append(el("div", "hint", "ลิงก์ดูได้จากแอปของกล้อง เช่น Tapo: ตั้งค่ากล้อง → บัญชีกล้อง\n"
+    + "รูปแบบ rtsp://ชื่อผู้ใช้:รหัสผ่าน@ไอพีกล้อง:554/stream1"));
+  sheet.lastChild.style.whiteSpace = "pre-line";
+
+  // ระดับภาพของกล้องนี้: ปุ่มเลือกแบบเดียวกับทั้งแอป (ช่องเลือกของเบราว์เซอร์เป็นกล่องขาวหลุดธีม)
+  sheet.append(el("label", "", "ระดับภาพ"));
+  let level = cam && cam.privacy_own ? cam.privacy : "default";
+  const levels = el("div", "levels");
+  levels.id = "edit-levels";
+  const opts = [["default", "ตามค่าเริ่มต้น (" + modeLabel(S.mode) + ")"]].concat(S.modes.map((m) => [m.value, m.label]));
+  for (const [v, t] of opts) {
+    const b = el("button", "chip" + (v === level ? " on" : ""), t);
+    b.onclick = () => {
+      level = v;
+      for (const x of levels.children) x.classList.toggle("on", x === b);
+    };
+    levels.append(b);
+  }
+  sheet.append(levels);
+
+  const save = el("button", "primary", adding ? "เพิ่มกล้อง" : "บันทึก");
+  save.style.marginTop = "18px";
   save.onclick = async () => {
+    const src = webcam !== null ? String(webcam) : source.value.trim();
+    if (!name.value.trim()) return toast("ใส่ชื่อห้องก่อน");
+    if (adding && !src) return toast("แตะเว็บแคมที่ค้นเจอ หรือใส่ลิงก์กล้องก่อน");
+    if (level === "cctv" && !confirm("ให้กล้องนี้เป็นกล้องวงจรปิด (เห็นหน้าคน)?")) return;
     closeSheet();
-    if (level.value === "cctv" && !confirm("ให้กล้องนี้เป็นกล้องวงจรปิด (เห็นหน้าคน)?")) return;
-    await manageRun(Object.assign({ cmd: adding ? "add" : "edit", name: name.value.trim(), source: source.value.trim(),
-      privacy: level.value }, adding ? {} : { id: cam.id }), adding ? "กำลังเพิ่มกล้อง…" : "กำลังบันทึก…");
+    await manageRun(Object.assign({ cmd: adding ? "add" : "edit", name: name.value.trim(), source: src,
+      privacy: level }, adding ? {} : { id: cam.id }), adding ? "กำลังเพิ่มกล้อง…" : "กำลังบันทึก…");
   };
-  sheet.append(save);
+  const cancel = el("button", "", "ยกเลิก");
+  cancel.onclick = closeSheet;
+  sheet.append(save, cancel);
   if (!adding) {
-    const del = el("button", "danger", "ลบกล้อง");
+    // ลบอยู่ล่างสุด แยกจากบันทึก/ยกเลิก กันนิ้วพลาด และยังต้องยืนยันอีกครั้ง
+    const del = el("button", "link-danger", "ลบกล้องนี้…");
     del.onclick = async () => {
       if (!confirm(`ลบ "${cam.name}"? บริเวณนี้จะไม่ถูกเฝ้าระวังอีก`)) return;
       closeSheet();
@@ -1180,9 +1217,6 @@ function editSheet(cam) {
     };
     sheet.append(del);
   }
-  const cancel = el("button", "", "ยกเลิก");
-  cancel.onclick = closeSheet;
-  sheet.append(cancel);
   $("sheet-bg").hidden = false;
 }
 
