@@ -5,45 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="FallGuard">
-<meta name="theme-color" content="#0a0e1f">
+<meta name="theme-color" content="#e5eaf1">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>FallGuard</title>
 <style>
-  /* Glassmorphism: การ์ดโปร่งแสงเบลอพื้นหลังสีเข้มที่มีแสงสีนุ่ม ๆ
-     พื้นหลังจงใจมืด ตัวหนังสือขาวบนกระจกจึงยังอ่านง่าย (ต่างสีเกิน 7 เท่า ตัวหนังสือรองเกิน 4.5)
-     หน้าจอแจ้งเตือนคนล้มเป็นสีแดงทึบเหมือนเดิม ไม่ใช้กระจก ต้องเห็นชัดจากไกลทันที */
+  /* Soft UI (neumorphism): พื้นเทาอมฟ้าสีเดียว ทุกอย่างปั้นจากพื้นด้วยเงาสว่างซ้ายบน + เงามืดขวาล่าง
+     นูน = กดได้ (การ์ด ปุ่ม)  บุ๋ม = ช่องใส่ข้อมูล หรือปุ่มที่กดอยู่
+     ตัวหนังสือเข้มบนพื้นสว่าง (ต่างสีเกิน 12 เท่า ตัวหนังสือรองเกิน 5 เท่า) ปุ่มหลักและตัวเลือกที่เลือกอยู่มีสีทึบ
+     เพราะเงาอย่างเดียวจางเกินไปสำหรับคนสายตาไม่ดี
+     หน้าจอแจ้งเตือนคนล้มเป็นสีแดงทึบเหมือนเดิม ต้องเห็นชัดจากไกลทันที */
   :root {
-    --bg: #0a0e1f;
-    --glass: rgba(255,255,255,.07); --glass-2: rgba(255,255,255,.12); --glass-3: rgba(255,255,255,.18);
-    --line: rgba(255,255,255,.14); --line-hi: rgba(255,255,255,.26);
-    --blur: saturate(150%) blur(18px);
-    --card: var(--glass); --card2: var(--glass-2);
-    --text: #eef2ff; --muted: #b6bed2; --ok: #34d399; --warn: #fbbf24; --trouble: #fb923c;
-    --alert: #f87171; --accent: #4f46e5; --danger: #dc2626;
-    --grad: linear-gradient(135deg, #2563eb, #6d28d9);
+    --bg: #e5eaf1; --well: #dee4ec;
+    --sh-d: rgba(163,177,198,.78); --sh-l: rgba(255,255,255,.95);
+    --raised: 7px 7px 16px var(--sh-d), -7px -7px 16px var(--sh-l);
+    --raised-sm: 4px 4px 10px var(--sh-d), -4px -4px 10px var(--sh-l);
+    --inset: inset 3px 3px 7px var(--sh-d), inset -3px -3px 7px var(--sh-l);
+    --text: #1e293b; --muted: #556074; --ok: #047857; --warn: #a16207; --trouble: #c2410c;
+    --alert: #dc2626; --accent: #4338ca; --danger: #dc2626;
+    --grad: linear-gradient(135deg, #2563eb, #4f46e5);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { margin: 0; background: var(--bg); color: var(--text); }
   body {
-    margin: 0; background: transparent; color: var(--text); min-height: 100vh;
+    margin: 0; background: var(--bg); color: var(--text); min-height: 100vh;
     font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Leelawadee UI", Tahoma, sans-serif;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
              max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     -webkit-user-select: none; user-select: none;
-  }
-  /* แสงสีด้านหลังกระจก: ตรึงไว้กับจอ เลื่อนหน้าแล้วกระจกเบลอแสงต่างตำแหน่งกัน ดูมีมิติ */
-  body::before {
-    content: ""; position: fixed; inset: -10%; z-index: -1; pointer-events: none;
-    background:
-      radial-gradient(38% 30% at 12% 8%, rgba(99,102,241,.55), transparent 70%),
-      radial-gradient(34% 28% at 92% 26%, rgba(14,165,233,.38), transparent 70%),
-      radial-gradient(42% 34% at 72% 92%, rgba(139,92,246,.42), transparent 70%),
-      radial-gradient(30% 24% at 8% 70%, rgba(236,72,153,.18), transparent 70%),
-      linear-gradient(165deg, #0a0e1f 0%, #121a3a 55%, #0a0e1f 100%);
   }
   [hidden] { display: none !important; }
   h1 { font-size: 28px; margin: 4px 0 0; letter-spacing: .2px; }
@@ -51,62 +43,59 @@
   .sub { color: var(--muted); margin: 2px 0 14px; }
   .muted { color: var(--muted); }
   .small { font-size: 15px; }
-  .glass, .card, .cam, .opt, .camrow, .chip, input.search, .sheet .found, .sheet input, .toast {
-    background: var(--glass); border: 1px solid var(--line);
-    -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
-  }
-  .card { border-radius: 18px; padding: 14px 15px; margin-bottom: 10px;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 24px rgba(0,0,0,.25); }
+  .card, .cam, .opt, .camrow, .toast, .sheet .found { background: var(--bg); box-shadow: var(--raised); border: 0; }
+  .card { border-radius: 20px; padding: 15px 16px; margin-bottom: 16px; }
   .row { display: flex; align-items: center; gap: 10px; }
   .grow { flex: 1; min-width: 0; }
-  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--muted); }
-  .dot.s { width: 8px; height: 8px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--muted);
+         box-shadow: 0 0 0 3px var(--bg), 2px 2px 5px 3px var(--sh-d); }
+  .dot.s { width: 8px; height: 8px; box-shadow: none; }
   button, .btn {
-    font: inherit; font-size: 17px; border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; width: 100%;
-    background: var(--glass-2); color: var(--text); cursor: pointer; display: block; text-align: center;
-    -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+    font: inherit; font-size: 17px; border: 0; border-radius: 15px; padding: 13px 14px; width: 100%;
+    background: var(--bg); color: var(--text); cursor: pointer; display: block; text-align: center;
+    box-shadow: var(--raised-sm); transition: box-shadow .12s, transform .12s;
   }
-  button.primary { background: var(--grad); border-color: rgba(255,255,255,.22); color: #fff; font-weight: 600;
-                   box-shadow: 0 8px 22px rgba(79,70,229,.38); }
-  button.danger { background: var(--danger); border-color: rgba(255,255,255,.2); color: #fff; font-weight: 700; }
-  button.link-danger { background: transparent; border-color: transparent; color: var(--alert); font-weight: 600;
-                       margin-top: 18px; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  button.warn { background: var(--warn); border-color: transparent; color: #111; font-weight: 600; }
-  button:active { opacity: .75; }
-  button + button { margin-top: 8px; }
+  button:active { box-shadow: var(--inset); transform: translateY(1px); }
+  button.primary { background: var(--grad); color: #fff; font-weight: 600; }
+  button.primary:active { box-shadow: inset 2px 2px 6px rgba(0,0,0,.25); }
+  button.danger { background: var(--danger); color: #fff; font-weight: 700; }
+  button.link-danger { background: transparent; color: var(--alert); font-weight: 600; margin-top: 18px; box-shadow: none; }
+  button.warn { background: #f59e0b; color: #111; font-weight: 600; }
+  button + button { margin-top: 12px; }
   .row > button + button { margin-top: 0; }        /* ปุ่มเรียงแนวนอนต้องสูงเท่ากัน */
-  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; }
-  input.search {
-    width: 100%; font: inherit; color: var(--text);
-    border-radius: 14px; padding: 11px 14px; margin-bottom: 10px; outline: none; -webkit-user-select: text; user-select: text;
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 22px 0 10px; }
+  input.search, .sheet input {
+    width: 100%; font: inherit; color: var(--text); background: var(--well); border: 0; box-shadow: var(--inset);
+    border-radius: 14px; padding: 12px 14px; outline: none; -webkit-user-select: text; user-select: text;
   }
+  input.search { margin-bottom: 14px; }
   input.search::placeholder, .sheet input::placeholder { color: var(--muted); }
-  input.search:focus, .sheet input:focus { border-color: var(--line-hi); background: var(--glass-2); }
+  input.search:focus, .sheet input:focus { box-shadow: var(--inset), 0 0 0 2px #818cf8; }
 
   /* การ์ดกล้อง */
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .cam { border-radius: 18px; overflow: hidden; cursor: pointer; position: relative;
-         box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .cam { border-radius: 20px; overflow: hidden; cursor: pointer; position: relative; }
+  .cam:active { box-shadow: var(--inset); }
   .cam.wide { grid-column: 1 / -1; }
-  .cam.fallen { border: 2px solid var(--alert); box-shadow: 0 0 0 3px rgba(248,113,113,.25), 0 8px 24px rgba(0,0,0,.25); }
-  .cam.offline { border-color: rgba(251,146,60,.65); }
-  .cam .media { position: relative; background: #000; height: 104px; display: flex; align-items: center; justify-content: center; }
+  .cam.fallen { box-shadow: 0 0 0 3px var(--alert), var(--raised); }
+  .cam.offline { box-shadow: 0 0 0 2px rgba(194,65,12,.55), var(--raised); }
+  .cam .media { position: relative; background: #000; height: 104px; display: flex; align-items: center; justify-content: center;
+                margin: 7px 7px 0; border-radius: 14px; overflow: hidden; }
   .cam.wide .media { height: 170px; }
   .cam.wide.tall .media { height: 150px; }
   .cam img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cam.wide.all img { object-fit: contain; }
   .cam.offline img { opacity: .35; }
-  .cam .ph { font-size: 28px; color: var(--muted); }
+  .cam .ph { font-size: 28px; color: #94a3b8; }
   .cam .tiles { position: absolute; inset: 0; display: grid; gap: 2px; background: #111; }
   .cam .tile { background: #000; overflow: hidden; }
   .cam .tile.off img { opacity: .35; }
   .cam .off { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-              color: var(--trouble); font-weight: 700; }
+              color: #fdba74; font-weight: 700; }
   .pill { position: absolute; top: 8px; padding: 3px 9px; border-radius: 10px; font-size: 14px; font-weight: 700; color: #fff; }
-  .pill.people { right: 8px; background: rgba(10,14,31,.5); border: 1px solid var(--line);
-                 -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .pill.people { right: 8px; background: rgba(15,23,42,.62); }
   .pill.alarm { left: 8px; background: var(--danger); }
-  .cam .info { padding: 9px 12px 11px; }
+  .cam .info { padding: 9px 13px 12px; }
   .cam .name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cam .st { color: var(--muted); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -115,24 +104,25 @@
   .ev img { width: 100%; max-height: 190px; object-fit: contain; background: #000; border-radius: 12px; margin: 6px 0 4px; display: block; }
 
   /* ดูกล้อง */
-  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+  .chips { display: flex; gap: 10px; overflow-x: auto; padding: 8px 8px 14px; margin: -6px -8px 0; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
-  .chip { flex: none; width: auto; padding: 8px 15px; border-radius: 20px; white-space: nowrap; font-size: 16px; }
-  .chip.on { background: var(--grad); border-color: rgba(255,255,255,.25); color: #fff; }
-  .screen { background: #000; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 4 / 3;
-            border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .chip { flex: none; width: auto; padding: 9px 16px; border-radius: 20px; white-space: nowrap; font-size: 16px; }
+  .chip.on { background: var(--grad); color: #fff; font-weight: 600; }
+  .screen { background: #000; border-radius: 18px; overflow: hidden; position: relative; aspect-ratio: 4 / 3;
+            box-shadow: var(--raised); border: 6px solid var(--bg); }
   .screen canvas, .screen img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .live-status { margin-top: 10px; font-size: 17px; }
-  .back { width: auto; display: inline-block; padding: 8px 14px; margin-bottom: 10px; }
+  .live-status { margin-top: 12px; font-size: 17px; }
+  .back { width: auto; display: inline-block; padding: 8px 15px; margin-bottom: 14px; }
 
-  /* แจ้งเตือนเต็มจอ: แดงทึบ ไม่ใช้กระจก */
-  #v-alert { position: fixed; inset: 0; background: linear-gradient(180deg, #a10b1f, #7f0716); z-index: 10; overflow-y: auto;
+  /* แจ้งเตือนเต็มจอ: แดงทึบ ไม่ใช่สีพื้นนูน */
+  #v-alert { position: fixed; inset: 0; background: linear-gradient(180deg, #a10b1f, #7f0716); color: #fff; z-index: 10; overflow-y: auto;
              padding: max(24px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom)); text-align: center; }
   #v-alert h1 { font-size: 32px; margin-top: 18px; }
   #v-alert .msg { font-size: 21px; margin: 14px 0 6px; }
   #v-alert img { width: 100%; max-height: 34vh; object-fit: contain; background: rgba(0,0,0,.25); border-radius: 14px; margin: 14px 0; }
-  #v-alert button { -webkit-backdrop-filter: none; backdrop-filter: none; }
-  #v-alert button.ackbtn { background: #fff; border-color: #fff; color: #96081a; font-size: 21px; font-weight: 800; padding: 17px; border-radius: 18px; }
+  #v-alert button { box-shadow: none; }
+  #v-alert button.ackbtn { background: #fff; color: #96081a; font-size: 21px; font-weight: 800; padding: 17px; border-radius: 18px;
+                           box-shadow: 0 6px 18px rgba(0,0,0,.3); }
   #v-alert button.ghost { background: transparent; border: 2px solid #fff; color: #fff; font-size: 17px; }
 
   /* ติดตั้ง / จับคู่ */
@@ -141,29 +131,28 @@
   .steps li::before { content: counter(s); position: absolute; left: 0; top: -2px; width: 28px; height: 28px; border-radius: 50%;
                       background: var(--grad); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
   .share { display: inline-block; vertical-align: -4px; width: 20px; height: 20px; }
-  #scan-video { width: 100%; border-radius: 16px; background: #000; aspect-ratio: 3 / 4; object-fit: cover; border: 1px solid var(--line); }
+  #scan-video { width: 100%; border-radius: 18px; background: #000; aspect-ratio: 3 / 4; object-fit: cover;
+                border: 6px solid var(--bg); box-shadow: var(--raised); }
   /* จัดการกล้อง */
-  .opt { border-radius: 16px; padding: 11px 14px; margin-bottom: 8px; border-width: 2px; border-color: var(--line); cursor: pointer; }
-  .opt.on { border-color: #818cf8; background: rgba(99,102,241,.18); box-shadow: 0 0 0 3px rgba(129,140,248,.18); }
-  .opt .tag { float: right; background: var(--warn); color: #111; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
-  .camrow { border-radius: 16px; padding: 11px 14px; margin-bottom: 8px; cursor: pointer; }
-  .manage-btn { width: auto; padding: 7px 13px; border-radius: 14px; font-size: 16px; font-weight: 700; margin-left: 10px; }
-  .sheet-bg { position: fixed; inset: 0; background: rgba(4,6,16,.5); z-index: 15; display: flex; align-items: flex-end; }
-  .sheet { background: rgba(22,26,52,.72); width: 100%; border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
-           max-height: 90vh; overflow-y: auto; border-top: 1px solid var(--line-hi);
-           -webkit-backdrop-filter: saturate(160%) blur(26px); backdrop-filter: saturate(160%) blur(26px); }
-  .sheet input { width: 100%; font: inherit; color: var(--text); border-radius: 14px;
-                 padding: 11px 13px; margin-bottom: 8px; outline: none; -webkit-user-select: text; user-select: text; }
-  .sheet .found { border-radius: 14px; padding: 10px 13px; margin-bottom: 6px; cursor: pointer; }
-  .sheet label { display: block; font-weight: 700; margin: 12px 0 6px; }
+  .opt { border-radius: 16px; padding: 12px 15px; margin-bottom: 12px; cursor: pointer; }
+  .opt.on { box-shadow: var(--inset), inset 0 0 0 2px #6366f1; color: var(--accent); }
+  .opt .tag { float: right; background: #fde68a; color: #713f12; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
+  .camrow { border-radius: 16px; padding: 12px 15px; margin-bottom: 12px; cursor: pointer; }
+  .camrow:active, .opt:active, .sheet .found:active { box-shadow: var(--inset); }
+  .manage-btn { width: auto; padding: 7px 14px; border-radius: 14px; font-size: 16px; font-weight: 700; margin-left: 10px; }
+  .sheet-bg { position: fixed; inset: 0; background: rgba(30,41,59,.38); z-index: 15; display: flex; align-items: flex-end; }
+  .sheet { background: var(--bg); width: 100%; border-radius: 24px 24px 0 0; padding: 20px 16px calc(18px + env(safe-area-inset-bottom));
+           max-height: 90vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(30,41,59,.25); }
+  .sheet input { margin-bottom: 10px; }
+  .sheet .found { border-radius: 14px; padding: 11px 14px; margin-bottom: 10px; cursor: pointer; box-shadow: var(--raised-sm); }
+  .sheet label { display: block; font-weight: 700; margin: 14px 0 8px; }
   .sheet .hint { color: var(--muted); font-size: 15px; margin: -2px 0 8px; }
-  .levels { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
-  .levels .chip { background: var(--glass-2); }
+  .levels { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; padding: 2px; }
   .levels .chip.on { background: var(--grad); color: #fff; }
   .levels .chip + .chip { margin-top: 0; }
   .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
-           background: rgba(22,26,52,.8); color: var(--text); padding: 10px 16px; border-radius: 14px; z-index: 20; max-width: 90vw;
-           box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+           background: #1e293b; color: #f8fafc; padding: 11px 17px; border-radius: 16px; z-index: 20; max-width: 90vw;
+           box-shadow: 0 10px 26px rgba(30,41,59,.4); }   /* ข้อความแวบเดียว ต้องเด่นจากพื้น จึงเป็นสีเข้มทึบ */
 </style>
 </head>
 <body>
