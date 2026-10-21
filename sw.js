@@ -6,7 +6,7 @@
  */
 importScripts("crypto.js");
 
-const CACHE = "fallguard-v11";
+const CACHE = "fallguard-v12";
 const SHELL = ["./", "index.html", "app.js", "crypto.js", "vendor/jsQR.js", "manifest.webmanifest",
                "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 

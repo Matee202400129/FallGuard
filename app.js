@@ -1413,6 +1413,28 @@ $("btn-rename").onclick = () => {
     renderHome();
   }
 };
+// หน้าตาแอป: ตามมือถือ -> สว่าง -> มืด (จำไว้ในเครื่องนี้ ยกเลิกจับคู่แล้วก็ยังจำ)
+const THEMES = { auto: "ตามมือถือ", light: "สว่าง", dark: "มืด" };
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+function applyTheme() {
+  let t = store.get("theme", "auto");
+  if (!THEMES[t]) t = "auto";
+  if (t === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t;
+  const dark = t === "dark" || (t === "auto" && darkQuery.matches);
+  for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.content = dark ? "#252932" : "#e5eaf1";
+  $("btn-theme").textContent = "🌓 หน้าตาแอป: " + THEMES[t];
+}
+$("btn-theme").onclick = () => {
+  const order = ["auto", "light", "dark"];
+  const next = order[(order.indexOf(store.get("theme", "auto")) + 1) % order.length];
+  store.set("theme", next);
+  applyTheme();
+  toast(next === "auto" ? "หน้าตาแอปเปลี่ยนตามโหมดมืดของมือถือ" : `ใช้หน้าตาแบบ${THEMES[next]}เสมอ`);
+};
+if (darkQuery.addEventListener) darkQuery.addEventListener("change", applyTheme);
+applyTheme();
+
 $("btn-unpair").onclick = async () => {
   if (!confirm("ยกเลิกการจับคู่? เครื่องนี้จะไม่ได้รับแจ้งเตือนอีก จนกว่าจะสแกน QR ใหม่")) return;
   await sendSigned({ type: "wp-unsub" });

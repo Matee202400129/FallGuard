@@ -13,6 +13,11 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>FallGuard</title>
+<script>
+  // หน้าตาที่เลือกไว้ (สว่าง/มืด) ใส่ก่อนหน้าเว็บวาด จะได้ไม่วาบเป็นอีกสีตอนเปิดแอป
+  try { const t = JSON.parse(localStorage.getItem("fg.theme") || '"auto"');
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 <style>
   /* Soft UI (neumorphism) สว่าง/มืดตามเครื่อง: พื้นสีเดียว ทุกอย่างปั้นจากพื้นด้วยเงาสว่างซ้ายบน + เงามืดขวาล่าง
      นูน = กดได้ (การ์ด ปุ่ม)  บุ๋ม = ช่องใส่ข้อมูล หรือปุ่มที่กดอยู่
@@ -30,8 +35,9 @@
     --grad: linear-gradient(135deg, #2563eb, #4f46e5);
   }
   /* โหมดมืด: ตามการตั้งค่าของ iPhone (ตั้งค่า > จอภาพและความสว่าง) พื้นเทาเข้ม เงาสว่างจางลง */
+  /* โหมดมืด: ตามการตั้งค่าของ iPhone หรือเลือกเองด้วยปุ่ม "หน้าตาแอป" (data-theme บน <html>) */
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #252932; --well: #1f222a;
       --sh-d: rgba(10,12,16,.85); --sh-l: rgba(60,66,80,.55);
       --text: #e8ecf3; --muted: #9ea8ba; --ok: #34d399; --warn: #fbbf24; --trouble: #fb923c;
@@ -39,8 +45,17 @@
       --toast-bg: #e8ecf3; --toast-fg: #1e293b; --scrim: rgba(0,0,0,.55);
       color-scheme: dark;
     }
-    .opt .tag { background: #78350f; color: #fde68a; }
+    :root:not([data-theme="light"]) .opt .tag { background: #78350f; color: #fde68a; }
   }
+  :root[data-theme="dark"] {
+      --bg: #252932; --well: #1f222a;
+      --sh-d: rgba(10,12,16,.85); --sh-l: rgba(60,66,80,.55);
+      --text: #e8ecf3; --muted: #9ea8ba; --ok: #34d399; --warn: #fbbf24; --trouble: #fb923c;
+      --alert: #f87171; --accent: #a5b4fc;
+      --toast-bg: #e8ecf3; --toast-fg: #1e293b; --scrim: rgba(0,0,0,.55);
+      color-scheme: dark;
+  }
+  :root[data-theme="dark"] .opt .tag { background: #78350f; color: #fde68a; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { margin: 0; background: var(--bg); color: var(--text); }
   body {
@@ -229,6 +244,7 @@
   <div style="margin-top:14px">
     <button id="btn-test">ทดสอบแจ้งเตือนเข้าเครื่องนี้</button>
     <button id="btn-rename">ชื่อเครื่องนี้</button>
+    <button id="btn-theme">🌓 หน้าตาแอป: ตามมือถือ</button>
     <button id="btn-unpair">จับคู่ใหม่ / ยกเลิกการจับคู่</button>
   </div>
 </section>
