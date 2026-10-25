@@ -832,17 +832,82 @@ async function startLive() {
   }
 }
 
+// ภาพผ่านอินเทอร์เน็ตใช้ WebSocket: สายแบบ fetch ถูก Cloudflare กักไว้เป็นก้อน ~100 KB
+// (วัดจริง: ภาพมาทีละ 1.5 วินาทีแล้วเงียบ 1.5 วินาที) WebSocket ส่งต่อทันทีทีละข้อความ ภาพเดินสม่ำเสมอ
+// คอมรุ่นเก่าที่ยังไม่มีช่องนี้ = ต่อไม่ติดตั้งแต่แรก -> กลับไปใช้แบบเดิมเอง
+async function* wsBlobs(url, ctl) {
+  const ws = new WebSocket(url);
+  ws.binaryType = "arraybuffer";
+  const q = [];
+  let wake = null, err = null, closed = false, opened = false;
+  const poke = () => { if (wake) { const w = wake; wake = null; w(); } };
+  ws.onopen = () => { opened = true; poke(); };
+  ws.onmessage = (e) => { q.push(new Uint8Array(e.data)); poke(); };
+  ws.onerror = () => { err = err || new Error(opened ? "สายหลุด" : "ws-open"); poke(); };
+  ws.onclose = () => { closed = true; poke(); };
+  const stop = () => ws.close();
+  ctl.signal.addEventListener("abort", stop);
+  try {
+    for (;;) {
+      if (q.length) { yield q.shift(); continue; }
+      if (err) throw err;
+      if (closed) throw new Error(opened ? "สายหลุด" : "ws-open");
+      await new Promise((r) => (wake = r));
+    }
+  } finally {
+    ctl.signal.removeEventListener("abort", stop);
+    ws.close();
+  }
+}
+
+async function* fetchBlobs(r) {
+  const reader = r.body.getReader();
+  let buf = new Uint8Array(0);
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) throw new Error("สายหลุด");
+    buf = concatBytes(buf, value);
+    while (buf.length >= 4) {
+      const len = (buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3]) >>> 0;
+      if (len <= 0 || len > 4 * 1048576) throw new Error("ข้อมูลผิดรูปแบบ");
+      if (buf.length < 4 + len) break;
+      const blob = buf.subarray(4, 4 + len);
+      buf = buf.slice(4 + len);
+      yield blob;
+    }
+  }
+}
+
+// คุณภาพภาพสด: ชัด (800 จุด ~1.5 Mbps) หรือประหยัดเน็ต (480 จุด ~0.45 Mbps) จำไว้ในเครื่องนี้
+function liveQuality() {
+  return store.get("liveQ", "hd") === "low" ? "low" : "hd";
+}
+
 async function streamOnce(ctl) {
   const cam = V.cam;
   const t = Math.floor(Date.now() / 1000);
   const wantH264 = !V.h264Broken && "VideoDecoder" in window;
-  const url = `${S.pc.tunnel}/m/live?cam=${cam}&t=${t}&s=${await S.proto.sign("live|" + cam + "|" + t)}&q=low`
-    + (wantH264 ? "&fmt=h264&v=2" : "");
-  const r = await fetch(url, { signal: ctl.signal, cache: "no-store" });
-  if (!r.ok) throw new Error("คอมตอบ " + r.status);
-  const video = r.headers.get("X-Format") === "h264";
-  const reader = r.body.getReader();
-  let buf = new Uint8Array(0);
+  const query = `cam=${cam}&t=${t}&s=${await S.proto.sign("live|" + cam + "|" + t)}`
+    + (liveQuality() === "low" ? "&q=low" : "") + (wantH264 ? "&fmt=h264&v=2" : "");
+  let blobs = null, video = null;
+  if (!V.wsBroken && "WebSocket" in window) {
+    const ws = wsBlobs(`${S.pc.tunnel.replace(/^http/, "ws")}/m/ws?${query}`, ctl);
+    try {
+      const first = await ws.next();             // ต่อติดและได้ข้อความแรก = ใช้ช่องนี้
+      blobs = (async function* () { yield first.value; yield* ws; })();
+    } catch (e) {
+      if (ctl.signal.aborted) throw e;
+      if (e.message !== "ws-open") throw e;
+      V.wsBroken = true;                          // คอมรุ่นเก่า: ใช้แบบเดิมไปจนปิดหน้านี้
+      blobs = null;
+    }
+  }
+  if (!blobs) {
+    const r = await fetch(`${S.pc.tunnel}/m/live?${query}`, { signal: ctl.signal, cache: "no-store" });
+    if (!r.ok) throw new Error("คอมตอบ " + r.status);
+    video = r.headers.get("X-Format") === "h264";
+    blobs = fetchBlobs(r);
+  }
   const meter = { since: Date.now(), frames: 0, bytes: 0 };
   const canvas = $("live-canvas");
   const ctx = canvas.getContext("2d");
@@ -868,21 +933,20 @@ async function streamOnce(ctl) {
     liveStatus(meter.text || `● ${video ? "วิดีโอสด" : "ภาพสด"}`, "var(--ok)");
   };
 
-  if (video) {
-    V.decoder = new VideoDecoder({
-      output: (frame) => {
-        draw(frame, frame.displayWidth, frame.displayHeight);
-        frame.close();
-      },
-      error: (e) => { V.decodeError = e; },
-    });
-  }
+  const makeDecoder = () => new VideoDecoder({
+    output: (frame) => {
+      draw(frame, frame.displayWidth, frame.displayHeight);
+      frame.close();
+    },
+    error: (e) => { V.decodeError = e; },
+  });
+  if (video) V.decoder = makeDecoder();
   let configured = false, ts = 0, stamped = false, timer = null;
   // ภาพที่รอถึงเวลาแสดง: เน็ตมือถือส่งมาเป็นพักๆ (บางทีห่าง 100 ms แล้วมาติดกัน 3 ภาพ)
   // ถ้าแสดงทันทีที่มาถึง ภาพจะเดินกระตุกตามเน็ต - รอนิดหนึ่งแล้วปล่อยตามจังหวะที่กล้องถ่ายจริง
   const queue = [];
   const play = V.play = new Playout();
-  const decoder = V.decoder;
+  let decoder = V.decoder;
   const feed = () => {
     timer = null;
     if (V.decoder !== decoder) return;     // สายนี้จบแล้ว (เปลี่ยนกล้อง/ต่อใหม่) ภาพที่ค้างทิ้งไป
@@ -897,19 +961,16 @@ async function streamOnce(ctl) {
     }
     if (queue.length) timer = setTimeout(feed, Math.max(0, queue[0].due - performance.now()));
   };
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) throw new Error("สายหลุด");
-    buf = concatBytes(buf, value);
-    while (buf.length >= 4) {
-      const len = (buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3]) >>> 0;
-      if (len <= 0 || len > 4 * 1048576) throw new Error("ข้อมูลผิดรูปแบบ");
-      if (buf.length < 4 + len) break;
-      const blob = buf.subarray(4, 4 + len);
-      buf = buf.slice(4 + len);
-      meter.bytes += len + 4;
+  for await (const blob of blobs) {
+    {
+      meter.bytes += blob.length + 4;
       const msg = await S.proto.openBytes(blob);
       if (!msg) continue;
+      if (video === null) {
+        // WebSocket ไม่มีหัว X-Format: ดูจากข้อความแรก - วิดีโอขึ้นต้นด้วย "C" ภาพนิ่งเป็น JPEG (FF D8)
+        video = !(msg[0] === 0xff && msg[1] === 0xd8);
+        if (video) { V.decoder = makeDecoder(); decoder = V.decoder; }
+      }
       if (!video) {
         const bmp = await createImageBitmap(new Blob([msg], { type: "image/jpeg" }));
         draw(bmp, bmp.width, bmp.height);
@@ -1405,6 +1466,20 @@ $("live-back").onclick = () => {
 $("live-snap").onclick = requestSnapshot;
 $("btn-manage").onclick = openManage;
 $("live-mode").onclick = chooseMode;
+function renderQuality() {
+  $("live-q-hd").classList.toggle("on", liveQuality() === "hd");
+  $("live-q-low").classList.toggle("on", liveQuality() === "low");
+}
+for (const [id, q] of [["live-q-hd", "hd"], ["live-q-low", "low"]]) {
+  $(id).onclick = () => {
+    if (liveQuality() === q) return;
+    store.set("liveQ", q);
+    renderQuality();
+    toast(q === "hd" ? "ภาพชัด (ใช้เน็ตมากขึ้น)" : "ประหยัดเน็ต (ภาพเล็กลง)");
+    startLive();                       // ต่อใหม่ด้วยคุณภาพที่เลือก
+  };
+}
+renderQuality();
 $("live-manage").onclick = () => {
   stopLive();
   openManage();
