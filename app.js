@@ -249,6 +249,16 @@ function handle(d, live) {
     case "event":
       onEvent(d, live);
       break;
+    case "clip": {
+      // คอมบันทึกคลิปวิดีโอเหตุการณ์เสร็จแล้ว (ราว 30 วินาทีหลังเกิดเหตุ) - ดูย้อนหลังได้จากประวัติ
+      const e = S.history.find((x) => x.id === d.id);
+      if (e && !e.clip) {
+        e.clip = true;
+        saveHistory();
+        if (S.view === "home") renderHistory();
+      }
+      break;
+    }
     case "ack":
       markAcked(d.id, d.by || "");
       if (S.alertId === d.id) closeAlert(`รับทราบแล้วโดย ${d.by || "คนอื่น"}`);
@@ -579,6 +589,12 @@ function renderHistory() {
     if (e.acked) meta += "  ·  รับทราบแล้ว" + (e.acked_by ? "โดย " + e.acked_by : "");
     else if (e.alert || (e.notice && noticeOpen(e))) meta += "  ·  ยังไม่มีใครรับทราบ";
     c.append(el("div", "muted small", meta));
+    if (e.clip) {
+      const v = el("button", "", "▶ ดูคลิปเหตุการณ์");
+      v.style.marginTop = "8px";
+      v.onclick = () => playClip(e);
+      c.append(v);
+    }
     if (e.alert && !e.acked) {
       const b = el("button", "danger", "รับทราบ");
       b.style.marginTop = "8px";
@@ -1206,8 +1222,51 @@ function sourceText(c) {
 }
 
 function closeSheet() {
+  const old = $("sheet").querySelector("video");
+  if (old) { old.pause(); URL.revokeObjectURL(old.src); }
   $("sheet-bg").hidden = true;
   $("sheet").innerHTML = "";
+}
+
+/** คลิปวิดีโอเหตุการณ์ (ก่อนเกิดเหตุ 20 วินาที ถึงหลัง 30 วินาที) โหลดจากคอมผ่านช่องภาพสด เข้ารหัสระหว่างทาง */
+async function playClip(e) {
+  const sheet = $("sheet");
+  sheet.innerHTML = "";
+  sheet.append(el("h2", "", (e.title || "เหตุการณ์") + " · " + (e.camera || "")));
+  sheet.append(el("div", "muted small", thaiDateTime(e.ts || 0, true) + " · ก่อนเกิดเหตุ 20 วินาที ถึงหลัง 30 วินาที"));
+  const status = el("div", "small", "กำลังโหลดคลิปจากคอม…");
+  status.style.margin = "12px 0";
+  sheet.append(status);
+  const close = el("button", "", "ปิด");
+  close.onclick = closeSheet;
+  sheet.append(close);
+  $("sheet-bg").hidden = false;
+  if (!S.pc.tunnel) {
+    status.textContent = "ต่อคอมไม่ได้ตอนนี้ (ต้องเปิดเฝ้าระวังบนคอมไว้) - คลิปยังเก็บอยู่บนคอม ดูได้ที่เมนูเครื่องมือ → ดูเหตุการณ์ย้อนหลัง";
+    return;
+  }
+  try {
+    const t = Math.floor(Date.now() / 1000);
+    const r = await fetch(`${S.pc.tunnel}/m/clip?id=${encodeURIComponent(e.id)}&t=${t}&s=${await S.proto.sign("clip|" + e.id + "|" + t)}`,
+      { cache: "no-store" });
+    if (r.status === 404) throw new Error("คลิปนี้ถูกลบจากคอมแล้ว (เก็บไว้ 30 วัน)");
+    if (!r.ok) throw new Error("คอมตอบ " + r.status);
+    const mp4 = await S.proto.openBytes(new Uint8Array(await r.arrayBuffer()));
+    if (!mp4) throw new Error("ถอดรหัสไม่ได้");
+    const url = URL.createObjectURL(new Blob([mp4], { type: "video/mp4" }));
+    const video = el("video");
+    Object.assign(video, { src: url, controls: true, playsInline: true, autoplay: true, muted: true });
+    video.style.cssText = "width:100%;border-radius:14px;background:#000;margin:4px 0 10px";
+    const save = el("a", "btn", "⬇ บันทึกคลิปลงมือถือ");
+    save.href = url;
+    save.download = `FallGuard ${(e.camera || "")} ${thaiDateTime(e.ts || 0, false)}.mp4`.replace(/[\/:*?"<>|]+/g, " ");
+    save.style.cssText = "text-decoration:none;margin-bottom:8px";
+    status.replaceWith(video);
+    close.before(save);
+  } catch (err) {
+    status.textContent = "เปิดคลิปไม่ได้: " + (err.message || err);
+    status.style.color = "var(--trouble)";
+  }
 }
 
 /** cam = null คือเพิ่มกล้องใหม่ */
