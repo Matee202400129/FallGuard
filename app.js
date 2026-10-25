@@ -1282,17 +1282,27 @@ function editSheet(cam) {
   name.value = adding ? "" : cam.name.replace(" (จำลอง)", "");
   sheet.append(name);
 
-  // แหล่งภาพ: แตะเว็บแคมที่ค้นเจอ หรือใส่ลิงก์กล้อง Wi-Fi (ค่าที่ส่งไปคอมยังเป็นเลขเว็บแคมแบบเดิม)
+  // แหล่งภาพ: เว็บแคมที่เสียบกับคอม หรือกล้อง Wi-Fi (กรอกทีละช่อง แอปประกอบลิงก์ให้ แบบเดียวกับบนคอม)
   sheet.append(el("label", "", "กล้อง"));
   if (!adding) sheet.append(el("div", "hint", "ตอนนี้: " + sourceText(cam) + " · ไม่เปลี่ยนก็ไม่ต้องแตะ"));
+  let kind = adding ? "wifi" : "";
   let webcam = null;
+  const kinds = el("div", "levels");
+  const camBox = el("div"), wifiBox = el("div");
+  const showKind = () => {
+    for (const x of kinds.children) x.classList.toggle("on", x.dataset.k === kind);
+    camBox.hidden = kind !== "webcam";
+    wifiBox.hidden = kind !== "wifi";
+  };
+  for (const [k, t] of [["wifi", "กล้อง Wi-Fi / วงจรปิด"], ["webcam", "เว็บแคมเสียบกับคอม"]]) {
+    const b = el("button", "chip", t);
+    b.dataset.k = k;
+    b.onclick = () => { kind = k; showKind(); };
+    kinds.append(b);
+  }
+  sheet.append(kinds, camBox, wifiBox);
+
   const picked = el("div", "hint");
-  const source = el("input");
-  source.placeholder = "ลิงก์กล้อง Wi-Fi เช่น rtsp://…";
-  source.autocapitalize = "off";
-  source.autocomplete = "off";
-  source.spellcheck = false;
-  source.oninput = () => { webcam = null; picked.textContent = ""; };
   const found = el("div");
   const find = el("button", "", "ค้นหาเว็บแคมที่เสียบกับคอม");
   find.onclick = async () => {
@@ -1306,7 +1316,6 @@ function editSheet(cam) {
       const row = el("div", "found", `เว็บแคม ตัวที่ ${f.index + 1}  (${f.size})` + (f.black ? "  - ภาพดำ อาจไม่ใช่กล้องจริง" : "  - มีภาพ"));
       row.onclick = () => {
         webcam = f.index;
-        source.value = "";
         found.innerHTML = "";
         picked.textContent = `✓ เลือกเว็บแคม ตัวที่ ${f.index + 1} แล้ว`;
       };
@@ -1314,10 +1323,94 @@ function editSheet(cam) {
     }
   };
   find.style.marginTop = "0";
-  sheet.append(find, found, picked, source);
-  sheet.append(el("div", "hint", "ลิงก์ดูได้จากแอปของกล้อง เช่น Tapo: ตั้งค่ากล้อง → บัญชีกล้อง\n"
-    + "รูปแบบ rtsp://ชื่อผู้ใช้:รหัสผ่าน@ไอพีกล้อง:554/stream1"));
-  sheet.lastChild.style.whiteSpace = "pre-line";
+  camBox.append(find, found, picked);
+
+  // กล้อง Wi-Fi: ยี่ห้อ -> ช่องภาพ (ชุดเดียวกับ fallguard/rtsp.py บนคอม)
+  const BRANDS = [
+    ["tapo", "Tapo / VIGI", "/stream1", "",
+     "ชื่อผู้ใช้/รหัสผ่าน: แอป Tapo → ตั้งค่ากล้อง → ตั้งค่าขั้นสูง → บัญชีกล้อง (ตั้งใหม่ที่นี่ ไม่ใช่รหัสบัญชี Tapo)\nไอพี: แอป Tapo → ตั้งค่ากล้อง → ข้อมูลอุปกรณ์"],
+    ["imou", "Imou / Dahua", "/cam/realmonitor?channel=1&subtype=0", "admin",
+     "ชื่อผู้ใช้ admin · รหัสผ่าน = รหัสอุปกรณ์ (Safety Code) บนสติกเกอร์ใต้กล้อง"],
+    ["ezviz", "EZVIZ / Hikvision", "/Streaming/Channels/101", "admin",
+     "ชื่อผู้ใช้ admin · รหัสผ่าน = รหัสยืนยัน 6 ตัวบนสติกเกอร์ใต้กล้อง · บางรุ่นต้องเปิด RTSP ในแอป EZVIZ ก่อน"],
+    ["other", "ยี่ห้ออื่น", "", "", "ใส่ลิงก์ RTSP เต็ม ๆ จากคู่มือ/แอปของกล้อง\nรูปแบบ rtsp://ชื่อผู้ใช้:รหัสผ่าน@ไอพีกล้อง:554/ช่องภาพ"],
+  ];
+  let brand = "tapo";
+  const field = (label, ph, type) => {
+    const box = el("div");
+    box.append(el("label", "", label));
+    const inp = el("input");
+    Object.assign(inp, { placeholder: ph, autocapitalize: "off", autocomplete: "off", spellcheck: false });
+    if (type) inp.type = type;
+    box.append(inp);
+    wifiBox.append(box);
+    return [box, inp];
+  };
+  const brands = el("div", "levels");
+  wifiBox.append(el("label", "", "ยี่ห้อ"), brands);
+  const [hostBox, host] = field("ไอพีกล้อง", "เช่น 192.168.1.50");
+  host.inputMode = "decimal";
+  const [userBox, user] = field("ชื่อผู้ใช้", "ชื่อผู้ใช้ของกล้อง");
+  const [passBox, pass] = field("รหัสผ่าน", "รหัสผ่านของกล้อง", "password");
+  const showPass = el("button", "chip", "แสดงรหัสผ่าน");
+  showPass.style.marginTop = "0";
+  showPass.onclick = () => {
+    pass.type = pass.type === "password" ? "text" : "password";
+    showPass.textContent = pass.type === "password" ? "แสดงรหัสผ่าน" : "ซ่อนรหัสผ่าน";
+  };
+  passBox.append(showPass);
+  const [urlBox, full] = field("ลิงก์กล้อง", "rtsp://…");
+  const hint = el("div", "hint");
+  hint.style.whiteSpace = "pre-line";
+  const preview = el("div", "hint");
+  const test = el("button", "", "ทดสอบการเชื่อมต่อ");
+  const result = el("div", "small");
+  result.style.margin = "4px 0 6px";
+  wifiBox.append(hint, preview, test, result);
+
+  const cleanHost = (t) => t.trim().replace(/^[a-z]+:\/\//i, "").split("@").pop().split("/")[0].split(":")[0].trim();
+  const wifiUrl = () => {
+    if (brand === "other") return full.value.trim();
+    const h = cleanHost(host.value);
+    if (!h) return "";
+    const b = BRANDS.find((x) => x[0] === brand);
+    const u = user.value.trim(), p = pass.value;
+    const auth = u || p ? encodeURIComponent(u) + (p ? ":" + encodeURIComponent(p) : "") + "@" : "";
+    return `rtsp://${auth}${h}:554${b[2]}`;
+  };
+  const refresh = () => {
+    for (const x of brands.children) x.classList.toggle("on", x.dataset.b === brand);
+    const b = BRANDS.find((x) => x[0] === brand);
+    hint.textContent = b[4];
+    urlBox.hidden = brand !== "other";
+    hostBox.hidden = userBox.hidden = passBox.hidden = brand === "other";
+    const u = wifiUrl();
+    preview.textContent = brand !== "other" && u ? "ลิงก์ที่ได้: " + u.replace(/^(rtsp:\/\/[^:@/]*:)[^@/]*@/, "$1••••@") : "";
+    result.textContent = "";
+  };
+  for (const b of BRANDS) {
+    const c = el("button", "chip", b[1]);
+    c.dataset.b = b[0];
+    c.onclick = () => {
+      if (!user.value.trim() || user.value.trim() === "admin") user.value = b[3];
+      brand = b[0];
+      refresh();
+    };
+    brands.append(c);
+  }
+  for (const inp of [host, user, pass, full]) inp.oninput = refresh;
+  test.onclick = async () => {
+    const u = wifiUrl();
+    if (!u) { result.textContent = "ใส่ไอพีกล้องก่อน"; result.style.color = "var(--trouble)"; return; }
+    test.textContent = "กำลังให้คอมลองต่อกล้อง…";
+    const res = await pcCommand({ cmd: "test_url", url: u });
+    test.textContent = "ทดสอบการเชื่อมต่อ";
+    if (!res) { result.textContent = "ต่อคอมไม่ได้ (ต้องเปิดเฝ้าระวังบนคอมไว้)"; result.style.color = "var(--trouble)"; return; }
+    result.textContent = res.message || res.error || "";
+    result.style.color = res.ok ? "var(--ok)" : "var(--trouble)";
+  };
+  refresh();
+  showKind();
 
   // ระดับภาพของกล้องนี้: ปุ่มเลือกแบบเดียวกับทั้งแอป (ช่องเลือกของเบราว์เซอร์เป็นกล่องขาวหลุดธีม)
   sheet.append(el("label", "", "ระดับภาพ"));
@@ -1338,9 +1431,11 @@ function editSheet(cam) {
   const save = el("button", "primary", adding ? "เพิ่มกล้อง" : "บันทึก");
   save.style.marginTop = "18px";
   save.onclick = async () => {
-    const src = webcam !== null ? String(webcam) : source.value.trim();
+    const src = kind === "webcam" ? (webcam !== null ? String(webcam) : "") : kind === "wifi" ? wifiUrl() : "";
     if (!name.value.trim()) return toast("ใส่ชื่อห้องก่อน");
-    if (adding && !src) return toast("แตะเว็บแคมที่ค้นเจอ หรือใส่ลิงก์กล้องก่อน");
+    if (kind === "wifi" && brand !== "other" && !/^[\w.-]+$/.test(cleanHost(host.value)))
+      return toast("ใส่ไอพีกล้องให้ถูก เช่น 192.168.1.50");
+    if (adding && !src) return toast(kind === "webcam" ? "กดค้นหาแล้วแตะเว็บแคมที่ค้นเจอก่อน" : "ใส่ข้อมูลกล้องก่อน");
     if (level === "cctv" && !confirm("ให้กล้องนี้เป็นกล้องวงจรปิด (เห็นหน้าคน)?")) return;
     closeSheet();
     await manageRun(Object.assign({ cmd: adding ? "add" : "edit", name: name.value.trim(), source: src,
