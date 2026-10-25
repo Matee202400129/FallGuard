@@ -296,6 +296,16 @@ function onEvent(d, live) {
   S.history = [d].concat(S.history.filter((e) => e.id !== d.id)).slice(0, MAX_HISTORY);
   saveHistory();
   if (live && d.alert && !d.acked && fresh(d) && (d.kind === "fall" || d.kind === "immobile")) openAlert(d.id);
+  if (live && d.notice && !d.acked && noticeOpen(d)) {
+    // เตือนสีเหลือง: สั่น + ข้อความสั้น การ์ดเหลืองบนหน้าแรกพร้อมปุ่มรับทราบ (ไม่ปลุกเต็มจอแบบคนล้ม)
+    if (navigator.vibrate) navigator.vibrate([400, 250, 400]);
+    toast("🟡 " + (d.title || "กำลังลุกจากเตียง") + " · " + (d.camera || ""));
+  }
+}
+
+// เตือนสีเหลืองค้างบนหน้าแรก 5 นาที (ลุกแล้วเรื่องก็จบไปแล้ว) หรือจนกว่าจะมีคนรับทราบ
+function noticeOpen(e) {
+  return Date.now() / 1000 - (e.ts || 0) < 300;
 }
 
 function ringLatest(batch) {
@@ -405,6 +415,17 @@ function renderHome() {
 function renderChecks() {
   const box = $("checks");
   box.innerHTML = "";
+  for (const e of S.history) {
+    if (!e.notice || e.acked || !noticeOpen(e)) continue;
+    const c = el("div", "card notice");
+    c.append(el("b", "", "🟡 " + (e.test ? "[ทดสอบ] " : "") + (e.title || "กำลังลุกจากเตียง")));
+    c.append(el("div", "", e.message || ""));
+    c.append(el("div", "small", ago(e.ts) + "  ·  ยังไม่มีใครรับทราบ"));
+    const b = el("button", "", "รับทราบ - กำลังไป");
+    b.onclick = () => ack(e.id);
+    c.append(b);
+    box.append(c);
+  }
   const add = (title, why, label, fn) => {
     const c = el("div", "card");
     c.append(el("b", "", "⚠ " + title));
@@ -542,6 +563,7 @@ function renderHistory() {
     let color = "var(--alert)";
     if (e.kind === "recovered") { t = "ลุกขึ้นได้แล้ว"; color = "var(--ok)"; }
     if (e.kind === "near_fall") { t = "ทรุดแต่ลุกเองได้"; color = "var(--warn)"; }
+    if (e.kind === "bed_exit") { t = "🟡 " + (e.title || "กำลังลุกจากเตียง"); color = "var(--warn)"; }
     if (e.kind === "power_lost" || e.kind === "camera_lost") color = "var(--trouble)";
     if (e.kind === "power_back") color = "var(--ok)";
     if (e.test) t = "[ทดสอบ] " + t;
@@ -555,7 +577,7 @@ function renderHistory() {
     } else if (e.image && e._att) loadEventImage(e);
     let meta = ago(e.ts) + "  ·  " + thaiDateTime(e.ts, false);
     if (e.acked) meta += "  ·  รับทราบแล้ว" + (e.acked_by ? "โดย " + e.acked_by : "");
-    else if (e.alert) meta += "  ·  ยังไม่มีใครรับทราบ";
+    else if (e.alert || (e.notice && noticeOpen(e))) meta += "  ·  ยังไม่มีใครรับทราบ";
     c.append(el("div", "muted small", meta));
     if (e.alert && !e.acked) {
       const b = el("button", "danger", "รับทราบ");

@@ -6,7 +6,7 @@
  */
 importScripts("crypto.js");
 
-const CACHE = "fallguard-v12";
+const CACHE = "fallguard-v13";
 const SHELL = ["./", "index.html", "app.js", "crypto.js", "vendor/jsQR.js", "manifest.webmanifest",
                "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
@@ -95,6 +95,7 @@ async function onPush(e) {
     title = (d.test ? "[ทดสอบ] " : "") + (d.title || "FallGuard") + (d.repeat ? " (เตือนซ้ำ)" : "");
     if (d.kind === "recovered") title = "ลุกขึ้นได้แล้ว";
     if (d.kind === "near_fall") title = "มีคนทรุดลงแต่ลุกเองได้";
+    if (d.notice) title = "🟡 " + title;
   } else if (d.type === "ack") {
     title = "รับทราบแล้ว" + (d.by ? "โดย " + d.by : "");
     body = "มีคนรับเรื่องแล้ว";
@@ -107,7 +108,7 @@ async function onPush(e) {
   return self.registration.showNotification(title, {
     body, tag, renotify: true,
     icon: "icons/icon-192.png",
-    requireInteraction: !!d.alert,
+    requireInteraction: !!(d.alert || d.notice),
     data: { id: d.id || "", type: d.type, alert: !!d.alert },
   });
 }
